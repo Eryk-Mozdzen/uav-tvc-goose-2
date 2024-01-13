@@ -6,6 +6,8 @@ class Object {
     static constexpr int dimQ = 6;
     static constexpr int dimU = 4;
 
+    static double w_t;
+
     using Q = Eigen::Vector<double, dimQ>;
 
     Q q;

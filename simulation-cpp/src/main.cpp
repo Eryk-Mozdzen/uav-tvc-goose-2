@@ -53,9 +53,9 @@ int main(int argc, char **argv) {
 	Simulation simulation(createGenerator(argc, argv));
 
 	Client client;
-	Chart chartAlpha("Thrust Vanes Angles", "α [°]", "%+3.0f", -20, 20);
-	Chart chartOmega("Rotor Angular Velocity", "ω [rad/s]", "%4.0f", 0, 1600);
-	GraphXY graph("XY Trajectory", "%+3.1f", 4);
+	Chart chartAlpha("Thrust Vanes Angles", "α [°]", "%+.1f", -15, 15);
+	Chart chartOmega("Rotor Angular Velocity", "ω [rad/s]", "%.0f", 0, 2000);
+	GraphXY graph("XY Trajectory", "%+.1f", 4);
 
 	Chart::Series alpha1(chartAlpha, Qt::red);
 	Chart::Series alpha2(chartAlpha, Qt::green);

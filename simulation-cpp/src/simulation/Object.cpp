@@ -3,6 +3,8 @@
 #include "Object.h"
 #include "Params.h"
 
+double Object::w_t = 0;
+
 Object::Object() {
     q.setZero();
     dq.setZero();
@@ -34,6 +36,8 @@ void Object::step(const double dt, const U &u) {
 
     dq_last = dq;
     ddq_last = ddq;
+
+    Object::w_t = Object::decodeControls(u).omega;
 
     assert(!ddq.hasNaN());
     assert(!dq.hasNaN());
@@ -92,17 +96,17 @@ Eigen::Matrix<double, Object::dimQ, Object::dimQ> Object::C(const Q &q, const Q 
         {(Params::J_yy - Params::J_xx)*(c_phi*d_theta + c_theta*s_phi*d_psi), 0, 0}
     };
 
-    /*const Eigen::Matrix3d C2 {
-        { 0,               Params::J_r*w_t, 0},
-        {-Params::J_r*w_t, 0,               0},
-        { 0,               0,               0}
-    };*/
+    const Eigen::Matrix3d C2 {
+        { 0,                       Params::J_r*Object::w_t, 0},
+        {-Params::J_r*Object::w_t, 0,                       0},
+        { 0,                       0,                       0}
+    };
 
     Eigen::Matrix<double, dimQ, dimQ> C;
 
     C.setZero();
     C.block(0, 0, 3, 3) = Params::m*Rinv*dR(q, dq)*Rinv;
-    C.block(3, 3, 3, 3) = J*Winv*dW(q, dq)*Winv*L + C1*Winv*L;
+    C.block(3, 3, 3, 3) = J*Winv*dW(q, dq)*Winv*L + C1*Winv*L + C2*Winv*L;
 
     C.row(0) +=C.row(4);
     C.row(1) -=C.row(3);
@@ -119,6 +123,11 @@ Eigen::Vector<double, Object::dimQ> Object::D(const Q &q) {
 
     D.setZero();
     D.block(0, 0, 3, 1) = Params::m*R(q).inverse()*Eigen::Vector3d(0, 0, Params::g);
+
+    const double Ft = Params::K_w*Object::w_t*Object::w_t;
+    const double Fs = Params::K_l*Ft*Params::a_s;
+    const double Mr = Params::K_m*Ft;
+    D(2) +=(4*Fs - Params::r*Mr);
 
     D.row(0) +=D.row(4);
     D.row(1) -=D.row(3);
