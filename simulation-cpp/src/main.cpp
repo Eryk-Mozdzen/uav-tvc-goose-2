@@ -1,5 +1,6 @@
 #include <iostream>
 #include <iomanip>
+#include <sstream>
 
 #include <QApplication>
 #include <QTimer>
@@ -13,12 +14,43 @@
 #include "Lemniscate.h"
 #include "Circle.h"
 
-int main(int argc, char *argv[]) {
+TrajectoryGenerator<4> * createGenerator(int argc, char **argv) {
+	std::string contents;
+
+    for(int i=1; i<argc; i++) {
+        contents +=argv[i];
+
+        if(i!=argc-1) {
+            contents +=' ';
+        }
+    }
+
+	std::istringstream stream(contents);
+
+	std::string type;
+	stream >> type;
+
+	if(type=="manual") {
+		return new Manual();
+	} else if(type=="lemniscate") {
+		float c, T;
+		stream >> c >> T;
+		return new Lemniscate(c, T);
+	} else if(type=="circle") {
+		float x, y, R, T;
+		stream >> x >> y >> R >> T;
+		return new Circle(x, y, R, T);
+	}
+
+	std::cerr << "undefined trajectory generator" << std::endl;
+
+	return nullptr;
+}
+
+int main(int argc, char **argv) {
 	QApplication app(argc, argv);
 
-	//Simulation simulation(new Manual());
-	Simulation simulation(new Lemniscate(2, 10));
-	//Simulation simulation(new Circle(2, 0, 1.5, 10));
+	Simulation simulation(createGenerator(argc, argv));
 
 	Client client;
 	Chart chartAlpha("Thrust Vanes Angles", "α [°]", "%+3.0f", -20, 20);

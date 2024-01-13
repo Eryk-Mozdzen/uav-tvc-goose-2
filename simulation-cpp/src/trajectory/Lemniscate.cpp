@@ -17,21 +17,21 @@ Lemniscate::Trajectory Lemniscate::get(const double time) {
         a*c/(1 + s*s),
         a*s*c/(1 + s*s),
         1,
-        fix(std::atan2(-1 + 3*c2, -(5 + c2)*s))
+        0//fix(std::atan2(-1 + 3*c2, -(5 + c2)*s))
     };
 
     trajectory.dy = Eigen::Vector<double, 4>{
         -2*a*w*(5 + c2)*s/((-3 + c2)*(-3 + c2)),
         2*a*w*(-1 + 3*c2)/((-3 + c2)*(-3 + c2)),
         0,
-        -6*w*c/(-3 + c2)
+        0//-6*w*c/(-3 + c2)
     };
 
     trajectory.ddy = Eigen::Vector<double, 4>{
         a*w*w*c*(-21 + 44*c2 + c4)/((-3 + c2)*(-3 + c2)*(-3 + c2)),
         4*a*w*w*s2*(7 + 3*c2)/((-3 + c2)*(-3 + c2)*(-3 + c2)),
         0,
-        -6*w*w*(5 + c2)*s/((-3 + c2)*(-3 + c2))
+        0//-6*w*w*(5 + c2)*s/((-3 + c2)*(-3 + c2))
     };
 
     return trajectory;
