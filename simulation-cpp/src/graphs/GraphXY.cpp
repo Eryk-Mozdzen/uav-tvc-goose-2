@@ -18,7 +18,7 @@ GraphXY::Series::Series(GraphXY &chart, const QColor color, const Qt::PenStyle s
     QTimer *timer = new QTimer();
 
     connect(timer, &QTimer::timeout, [&]() {
-        while(s.count()>100) {
+        while(s.count()>250) {
             s.remove(0);
         }
     });
@@ -38,13 +38,13 @@ GraphXY::GraphXY(const QString title, const QString format, const float range) :
     chart->legend()->hide();
 
     axisX = new QtCharts::QValueAxis(this);
-    axisX->setTitleText("X");
+    axisX->setTitleText("X [m]");
     axisX->setLabelFormat(format);
     axisX->setRange(-range, range);
     chart->addAxis(axisX, Qt::AlignBottom);
 
     axisY = new QtCharts::QValueAxis(this);
-    axisY->setTitleText("Y");
+    axisY->setTitleText("Y [m]");
     axisY->setLabelFormat(format);
     axisY->setRange(-range, range);
     chart->addAxis(axisY, Qt::AlignLeft);

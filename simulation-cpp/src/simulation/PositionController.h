@@ -5,7 +5,7 @@
 #include "Object.h"
 
 class PositionController {
-    static constexpr double dt = 0.005;
+    static constexpr double dt = 0.01;
 
     const Eigen::Matrix<double, 2, 2> Kp = 3*Eigen::Matrix<double, 2, 2>::Identity();
     const Eigen::Matrix<double, 2, 2> Kd = 3*Eigen::Matrix<double, 2, 2>::Identity();

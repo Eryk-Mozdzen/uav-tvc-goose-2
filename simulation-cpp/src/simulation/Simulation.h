@@ -8,7 +8,7 @@
 #include "TrajectoryGenerator.h"
 
 class Simulation {
-    static constexpr double dt = 0.005;
+    static constexpr double dt = 0.01;
 
     bool running;
     std::thread thread;
@@ -16,7 +16,7 @@ class Simulation {
 
     Object object;
     Controller controller;
-    TrajectoryGenerator<4> *generator;
+    TrajectoryGenerator<4> *generator = nullptr;
 
     Object::U u;
     Controller::Desired desired;

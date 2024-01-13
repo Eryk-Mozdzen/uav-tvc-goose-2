@@ -1,10 +1,10 @@
-#include "ManualControl.h"
+#include "Manual.h"
 
-ManualControl::ManualControl() : running{true}, thread{&ManualControl::loop, this} {
-    result.setZero();
+Manual::Manual() : running{true}, thread{&Manual::loop, this} {
+
 }
 
-ManualControl::~ManualControl() {
+Manual::~Manual() {
     mutex.lock();
     running = false;
     mutex.unlock();
@@ -14,7 +14,7 @@ ManualControl::~ManualControl() {
     }
 }
 
-void ManualControl::loop() {
+void Manual::loop() {
     while(true) {
         const Eigen::Vector<double, 4> input {
             +gamepad.get(Gamepad::Analog::LX),
@@ -29,11 +29,11 @@ void ManualControl::loop() {
             return;
         }
 
-        const Eigen::Vector<double, 4> last = result.col(1);
+        const Eigen::Vector<double, 4> last = trajectory.dy;
 
-        result.col(0) +=0.5*(input + last)*dt;
-        result.col(1) = input;
-        //result.col(2) = (input - last)/dt;
+        trajectory.y +=0.5*(input + last)*dt;
+        trajectory.dy = input;
+        //trajectory.ddy = (input - last)/dt;
 
         mutex.unlock();
 
@@ -41,12 +41,12 @@ void ManualControl::loop() {
     }
 }
 
-Eigen::Matrix<double, 4, 3> ManualControl::get(const double time) {
+Manual::Trajectory Manual::get(const double time) {
     (void)time;
 
     mutex.lock();
 
-    const Eigen::Matrix<double, 4, 3> copy = result;
+    const Trajectory copy = trajectory;
 
     mutex.unlock();
 

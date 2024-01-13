@@ -5,5 +5,17 @@
 template<int N>
 class TrajectoryGenerator {
 public:
-    virtual Eigen::Matrix<double, N, 3> get(const double time) = 0;
+    struct Trajectory {
+        Eigen::Vector<double, N> y;
+        Eigen::Vector<double, N> dy;
+        Eigen::Vector<double, N> ddy;
+
+        Trajectory() {
+            y.setZero();
+            dy.setZero();
+            ddy.setZero();
+        }
+    };
+
+    virtual Trajectory get(const double time) = 0;
 };

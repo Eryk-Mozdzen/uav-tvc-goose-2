@@ -6,11 +6,11 @@
 #include "TrajectoryGenerator.h"
 #include "Gamepad.h"
 
-class ManualControl : public TrajectoryGenerator<4> {
+class Manual : public TrajectoryGenerator<4> {
     static constexpr double dt = 0.05;
 
     Gamepad gamepad;
-    Eigen::Matrix<double, 4, 3> result;
+    Trajectory trajectory;
 
     bool running;
     std::thread thread;
@@ -19,8 +19,8 @@ class ManualControl : public TrajectoryGenerator<4> {
     void loop();
 
 public:
-    ManualControl();
-    ~ManualControl();
+    Manual();
+    ~Manual();
 
-    Eigen::Matrix<double, 4, 3> get(const double time);
+    Trajectory get(const double time);
 };

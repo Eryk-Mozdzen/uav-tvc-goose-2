@@ -1,6 +1,6 @@
 #include "Simulation.h"
 
-Simulation::Simulation(TrajectoryGenerator<4> *generator) : running{true}, thread{&Simulation::loop, this}, generator{generator}, time{0} {
+Simulation::Simulation(TrajectoryGenerator<4> *generator) : running{true}, thread{&Simulation::loop, this}, generator{generator}, time{0.001} {
 
 }
 
@@ -22,9 +22,11 @@ void Simulation::loop() {
             return;
         }
 
-        desired.y = generator->get(time).col(0);
-		desired.dy = generator->get(time).col(1);
-		desired.ddy = generator->get(time).col(2);
+        if(generator!=nullptr) {
+            desired.y = generator->get(time).y;
+            desired.dy = generator->get(time).dy;
+            desired.ddy = generator->get(time).ddy;
+        }
 
         u = controller(object.getState(), desired);
 
