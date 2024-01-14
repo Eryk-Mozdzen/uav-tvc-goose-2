@@ -126,8 +126,8 @@ Eigen::Vector<double, Object::dimQ> Object::D(const Q &q) {
 
     const double Ft = Params::K_w*Object::w_t*Object::w_t;
     const double Fs = Params::K_l*Ft*Params::a_s;
-    const double Mr = Params::K_m*Ft;
-    D(2) +=(4*Fs - Params::r*Mr);
+    const double Mr = Params::K_m*Object::w_t*Object::w_t;
+    D(5) +=(4*Fs + Mr/Params::r);
 
     D.row(0) +=D.row(4);
     D.row(1) -=D.row(3);
