@@ -15,11 +15,11 @@ class Simulation {
     std::mutex mutex;
 
     Object object;
-    Controller controller;
+    Controller<4> *controller = nullptr;
     TrajectoryGenerator<4> *generator = nullptr;
 
     Object::U u;
-    Controller::Desired desired;
+    TrajectoryGenerator<4>::Trajectory desired;
     double time;
 
     void loop();
@@ -29,10 +29,10 @@ public:
         double time;
         Object::State state;
         Object::Control control;
-        Controller::Desired desired;
+        TrajectoryGenerator<4>::Trajectory desired;
     };
 
-    Simulation(TrajectoryGenerator<4> *generator);
+    Simulation(Controller<4> *controller, TrajectoryGenerator<4> *generator);
     ~Simulation();
 
     Result read();

@@ -5,11 +5,12 @@
 #include <QApplication>
 #include <QTimer>
 
-#include "TrajectoryGenerator.h"
-#include "Simulation.h"
 #include "Client.h"
 #include "Chart.h"
 #include "GraphXY.h"
+#include "Simulation.h"
+#include "PFL.h"
+#include "TrajectoryGenerator.h"
 #include "Manual.h"
 #include "Lemniscate.h"
 #include "Circle.h"
@@ -50,7 +51,10 @@ TrajectoryGenerator<4> * createGenerator(int argc, char **argv) {
 int main(int argc, char **argv) {
 	QApplication app(argc, argv);
 
-	Simulation simulation(createGenerator(argc, argv));
+	Simulation simulation(
+		new PFL(),
+		createGenerator(argc, argv)
+	);
 
 	Client client;
 	Chart chartAlpha("Thrust Vanes Angles", "α [°]", "%+.1f", -15, 15);
