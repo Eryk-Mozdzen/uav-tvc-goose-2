@@ -16,11 +16,13 @@ class PFL : public Controller<4> {
         const Eigen::Matrix<double, 2, 2> Kd = 3*Eigen::Matrix<double, 2, 2>::Identity();
 
         U last_u;
+        U last_du;
 
     public:
         struct Output {
             U u;
             U du;
+            U ddu;
         };
 
         PositionController();

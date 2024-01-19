@@ -288,6 +288,10 @@ Object::Control Object::decodeControls(const U &general) {
     Control real;
     real.omega = std::sqrt(general(0)/Params::K_w);
 
+    if(std::isnan(real.omega)) {
+        real.omega = 0.001;
+    }
+
     const double C31 = general(1)/(Params::K_l*general(0));
     const double C42 = general(2)/(Params::K_l*general(0));
     const double Cs = general(3)/(Params::K_l*general(0));

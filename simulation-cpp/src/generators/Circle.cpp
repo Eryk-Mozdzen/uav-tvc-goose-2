@@ -14,14 +14,14 @@ Circle::Trajectory Circle::get(const double time) {
         r*c + x,
         r*s + y,
         1,
-        0//w*time + pi/2
+        w*time + pi/2
     };
 
     trajectory.dy = Eigen::Vector<double, 4>{
         -r*w*s,
         r*w*c,
         0,
-        0//w
+        w
     };
 
     trajectory.ddy = Eigen::Vector<double, 4>{

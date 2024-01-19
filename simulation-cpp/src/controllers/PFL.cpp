@@ -60,6 +60,7 @@ PFL::HoverController::U PFL::HoverController::operator()(const Object::State &st
 
 PFL::PositionController::PositionController() {
     last_u.setZero();
+    last_du.setZero();
 }
 
 PFL::PositionController::Output PFL::PositionController::operator()(const Object::State &state, const Y &y, const Y &dy, const Y &ddy) {
@@ -83,9 +84,12 @@ PFL::PositionController::Output PFL::PositionController::operator()(const Object
     Output output;
     output.u = Eigen::Vector<double, 2>(ref_phi, ref_theta);
     output.du = (output.u  - last_u)/dt;
-    //output.ddu = (output.du  - last_du)/dt;
+    output.ddu = (output.du  - last_du)/dt;
 
     last_u = output.u;
+    last_du = output.du;
+
+    output.ddu.setZero();
 
     return output;
 }
@@ -112,7 +116,7 @@ Object::U PFL::operator()(const Object::State &state, const TrajectoryGenerator<
 
     y.block(0, 0, 2, 1) = output.u;
     dy.block(0, 0, 2, 1) = output.du;
-    //ddy.block(0, 0, 2, 1) = output.ddu;
+    ddy.block(0, 0, 2, 1) = output.ddu;
     y.block(2, 0, 2, 1) = desired.y.block(2, 0, 2, 1);
     dy.block(2, 0, 2, 1) = desired.dy.block(2, 0, 2, 1);
     ddy.block(2, 0, 2, 1) = desired.ddy.block(2, 0, 2, 1);
