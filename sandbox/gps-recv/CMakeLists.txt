@@ -4,9 +4,11 @@ set(CMAKE_TOOLCHAIN_FILE "arm-none-eabi.cmake")
 
 project(gps-recv)
 
-enable_language(ASM C)
+enable_language(ASM C CXX)
 
 set(TARGET ${CMAKE_PROJECT_NAME}.elf)
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/eigen eigen)
 
 add_executable(${TARGET}
 	"../../third-party/stm32f4xx_hal_driver/Src/stm32f4xx_ll_usb.c"
@@ -38,6 +40,7 @@ add_executable(${TARGET}
 
 	"src/main.c"
 	"src/nmea.c"
+	"src/estimator.cpp"
 )
 
 target_compile_definitions(${TARGET} PRIVATE
@@ -83,6 +86,33 @@ target_compile_options(${TARGET} PRIVATE
 		-mfpu=fpv4-sp-d16
 		-specs=nano.specs
 	>
+
+	$<$<COMPILE_LANGUAGE:CXX>:
+		-O2 -g
+		-std=c++17
+
+		-Wall
+		-Wextra
+		-Wpedantic
+		-Wdouble-promotion
+		-Werror=return-type
+
+		-ffunction-sections
+		-fdata-sections
+		-fstack-usage
+		-fno-threadsafe-statics
+		-fno-common
+		-fno-exceptions
+		-fno-rtti
+
+		-mthumb
+		-mhard-float
+		-mcpu=cortex-m4
+		-mfloat-abi=hard
+		-mfpu=fpv4-sp-d16
+		-specs=nosys.specs
+		-specs=nano.specs
+	>
 )
 
 target_link_options(${TARGET} PRIVATE
@@ -102,6 +132,10 @@ target_link_options(${TARGET} PRIVATE
 
 	-static
 	-u _printf_float
+)
+
+target_link_libraries(${TARGET}
+	Eigen3::Eigen
 )
 
 add_custom_command(

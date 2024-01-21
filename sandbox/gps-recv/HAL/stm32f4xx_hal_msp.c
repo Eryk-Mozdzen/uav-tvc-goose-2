@@ -63,3 +63,20 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* huart) {
 		HAL_GPIO_DeInit(GPIOA, GPIO_PIN_2|GPIO_PIN_3);
 	}
 }
+
+
+void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base) {
+	if(htim_base->Instance==TIM11) {
+		__HAL_RCC_TIM11_CLK_ENABLE();
+		HAL_NVIC_SetPriority(TIM1_TRG_COM_TIM11_IRQn, 0, 0);
+		HAL_NVIC_EnableIRQ(TIM1_TRG_COM_TIM11_IRQn);
+	}
+}
+
+void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base) {
+	if(htim_base->Instance==TIM11) {
+		__HAL_RCC_TIM11_CLK_DISABLE();
+
+		HAL_NVIC_DisableIRQ(TIM1_TRG_COM_TIM11_IRQn);
+	}
+}
