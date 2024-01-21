@@ -1,0 +1,70 @@
+empty loop
+-O0  7.133 MHz
+-O1 16.645 MHz
+-O2 11.098 MHz
+-O3 11.098 MHz
+-Os 12.485 MHz
+
+mat*vec (dim = 3)
+    my              Eigen
+-O0  71.366 kHz     4.086 kHz
+-O1 616.270 kHz     2.852 MHz
+-O2   1.202 MHz     3.565 MHz
+-O3   6.239 MHz     4.754 MHz
+-Os 734.170 kHz   387.001 kHz
+
+mat*vec (dim = 12)
+    my              Eigen
+-O0   5.265 kHz     1.986 kHz
+-O1  51.729 kHz    80.970 kHz
+-O2  55.718 kHz    74.400 kHz
+-O3  90.359 kHz   113.970 kHz
+-Os  51.761 kHz    50.787 kHz
+
+mat*vec (dim = 100)
+    my              Eigen
+-O0      81 Hz         38 Hz
+-O1     877 Hz      1.623 kHz
+-O2   1.188 kHz     1.811 kHz
+-O3   1.065 kHz     1.777 kHz
+-Os     961 Hz      1.337 kHz
+
+mat.transpose()*vec + (mat*mat).inverse()*vec (dim = 3)
+    my              Eigen
+-O0   4.780 kHz       839 Hz
+-O1  34.635 kHz   149.453 kHz
+-O2  37.613 kHz   723.600 kHz
+-O3  73.376 kHz     1.029 MHz
+-Os  36.742 kHz    52.805 kHz
+
+mat.transpose()*vec + (mat*mat).inverse()*vec (dim = 6)
+    my              Eigen
+-O0   1.374 kHz        97 Hz
+-O1   7.448 kHz     6.294 kHz
+-O2   7.972 kHz     7.764 kHz
+-O3  12.869 kHz    11.203 kHz
+-Os   7.598 kHz     3.514 kHz
+
+mat.transpose()*vec + (mat*mat).inverse()*vec (dim = 12)
+    my              Eigen
+-O0     169 Hz         39 Hz
+-O1   1.265 kHz     1.372 kHz
+-O2   1.100 kHz     1.480 kHz
+-O3   1.420 kHz     1.619 kHz
+-Os   1.080 kHz       568 Hz
+
+mat.transpose()*vec + (mat*mat).inverse()*vec (dim = 24)
+    my              Eigen
+-O0      18 Hz          6 Hz
+-O1     157 Hz        229 Hz
+-O2     157 Hz        252 Hz
+-O3     157 Hz        262 Hz
+-Os     157 Hz         79 Hz
+
+mat.transpose()*vec + (mat*mat).inverse()*vec (dim = 50)
+    my              Eigen
+-O0       2 Hz          1 Hz
+-O1      19 Hz         31 Hz
+-O2      20 Hz         34 Hz
+-O3      20 Hz         35 Hz
+-Os      20 Hz         10 Hz
