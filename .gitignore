@@ -1,3 +1,9 @@
 
 **/build
 **/.vscode
+
+**/.metadata
+**/.settings
+**/*.launch
+**/.cproject
+**/Debug
