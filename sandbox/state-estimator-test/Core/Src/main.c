@@ -107,7 +107,7 @@ void LSM303DLHC_A_write(const uint8_t address, const uint8_t value) {
 }
 
 void LSM303DLHC_A_read(const uint8_t address, void *data, const uint8_t num) {
-	HAL_I2C_Mem_Read(&hi2c1, LSM303DLHC_A_I2C_ADDRESS, address, 1, data, num, HAL_MAX_DELAY);
+	HAL_I2C_Mem_Read(&hi2c1, LSM303DLHC_A_I2C_ADDRESS, address | (1<<7), 1, data, num, HAL_MAX_DELAY);
 }
 
 void LSM303DLHC_M_write(const uint8_t address, const uint8_t value) {
@@ -118,8 +118,8 @@ void LSM303DLHC_M_read(const uint8_t address, void *data, const uint8_t num) {
 	HAL_I2C_Mem_Read(&hi2c1, LSM303DLHC_M_I2C_ADDRESS, address, 1, data, num, HAL_MAX_DELAY);
 }
 
-#define L3GD20_SENSITIVITY			0.030518044f
-#define LSM303DLHC_A_SENSITIVITY	0.000488296f
+#define SENSITIVITY_GYROSCOPE		0.030518044f
+#define SENSITIVITY_ACCELEROMETER	1.f/1340.f
 
 float x = 0;
 float y = 0;
@@ -255,7 +255,7 @@ int main(void)
       LSM303DLHC_CTRL_REG4_A_BDU_ENABLE |
 	  LSM303DLHC_CTRL_REG4_A_BLE_LITTLE_ENDIAN |
 	  LSM303DLHC_CTRL_REG4_A_FS_FULL_SCALE_16G |
-	  LSM303DLHC_CTRL_REG4_A_HR_HIGH_RESOLUTION_DISABLE |
+	  LSM303DLHC_CTRL_REG4_A_HR_HIGH_RESOLUTION_ENABLE |
 	  LSM303DLHC_CTRL_REG4_A_SIM_4_WIRE_INTERFACE
   );
 
@@ -281,7 +281,7 @@ int main(void)
   );
 
   LSM303DLHC_M_write(LSM303DLHC_CRB_REG_M,
-      LSM303DLHC_CRB_REG_M_GN_SENSOR_INPUT_RAGE_1_3GAUSS
+      LSM303DLHC_CRB_REG_M_GN_SENSOR_INPUT_RAGE_8_1GAUSS
   );
 
   LSM303DLHC_M_write(LSM303DLHC_MR_REG_M,
@@ -290,7 +290,6 @@ int main(void)
 
   int16_t raw[3] = {0};
   L3GD20_read(L3GD20_OUT_X_L, raw, sizeof(raw));
-  LSM303DLHC_A_read(LSM303DLHC_OUT_X_L_A, raw, sizeof(raw));
 
   while(1) {
 
@@ -299,22 +298,21 @@ int main(void)
 
 		  L3GD20_read(L3GD20_OUT_X_L, raw, sizeof(raw));
 
-		  //x = raw[0]*L3GD20_SENSITIVITY;
-		  //y = raw[1]*L3GD20_SENSITIVITY;
-		  //z = raw[2]*L3GD20_SENSITIVITY;
+		  //x = raw[0]*SENSITIVITY_GYROSCOPE;
+		  //y = raw[1]*SENSITIVITY_GYROSCOPE;
+		  //z = raw[2]*SENSITIVITY_GYROSCOPE;
 	  }
 
 	  if(lsm303dlhc_drdy) {
 		  lsm303dlhc_drdy = false;
 
 		  LSM303DLHC_A_read(LSM303DLHC_OUT_X_L_A, raw, sizeof(raw));
+		  //LSM303DLHC_M_read(LSM303DLHC_OUT_X_H_M, raw, sizeof(raw));
 
-		  x = raw[0];//*LSM303DLHC_A_SENSITIVITY;
-		  y = raw[1];//*LSM303DLHC_A_SENSITIVITY;
-		  z = raw[2];//*LSM303DLHC_A_SENSITIVITY;
+		  x = raw[0]*SENSITIVITY_ACCELEROMETER;
+		  y = raw[1]*SENSITIVITY_ACCELEROMETER;
+		  z = raw[2]*SENSITIVITY_ACCELEROMETER;
 	  }
-
-	  //printf("%+10.2f %+10.2f %+10.2f\n", x, y, z);
 
 	  HAL_Delay(10);
 
