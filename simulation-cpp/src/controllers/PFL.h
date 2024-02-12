@@ -1,22 +1,19 @@
 #pragma once
 
-#include <Eigen/Dense>
-
 #include "Controller.h"
 
-class PFL : public Controller<4> {
+class PFL : public Controller {
 
     class PositionController {
+        using Q = Eigen::Vector<double, 6>;
         using Y = Eigen::Vector<double, 2>;
         using U = Eigen::Vector<double, 2>;
-
-        static constexpr double dt = 0.01;
 
         const Eigen::Matrix<double, 2, 2> Kp = 3*Eigen::Matrix<double, 2, 2>::Identity();
         const Eigen::Matrix<double, 2, 2> Kd = 3*Eigen::Matrix<double, 2, 2>::Identity();
 
-        U last_u;
-        U last_du;
+        static U last_u;
+        static U last_du;
 
     public:
         struct Output {
@@ -27,11 +24,12 @@ class PFL : public Controller<4> {
 
         PositionController();
 
-        Output operator()(const Object::State &state, const Y &y, const Y &dy, const Y &ddy);
+        Output operator()(const Q &q, const Q &dq, const Y &y, const Y &dy, const Y &ddy) const;
     };
 
     class HoverController {
     public:
+        using Q = Eigen::Vector<double, 6>;
         using Y = Eigen::Vector<double, 4>;
         using U = Eigen::Vector<double, 4>;
 
@@ -42,14 +40,14 @@ class PFL : public Controller<4> {
     public:
         HoverController();
 
-        U operator()(const Object::State &state, const Y &y, const Y &dy, const Y &ddy) const;
+        U operator()(const Q &q, const Q &dq, const Y &y, const Y &dy, const Y &ddy) const;
     };
 
     PositionController positionController;
     HoverController hoverController;
 
+    Eigen::VectorX<double> calculate(const Eigen::VectorX<double> &q, const Eigen::VectorX<double> &dq, const Eigen::VectorX<double> &trajectory) const;
+
 public:
     PFL();
-
-    Object::U operator()(const Object::State &state, const TrajectoryGenerator<4>::Trajectory &desired);
 };

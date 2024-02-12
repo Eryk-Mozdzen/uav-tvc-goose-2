@@ -3,10 +3,12 @@
 #include <QHostAddress>
 #include <QFileInfo>
 
-#include "Client.h"
+#include "VisualClient.h"
 
-Client::Client() {
-    socket.connectToHost(QHostAddress::LocalHost, 8080);
+VisualClient::VisualClient() : VisualizationSink<VisualClient>(30, 12, this) {
+
+    socket.connectToHost(QHostAddress::LocalHost, port);
+
     if(!socket.waitForConnected()) {
         qDebug() << "server not found";
         return;
@@ -39,30 +41,26 @@ Client::Client() {
 
     write("create column1 cylinder transform rotation 90 0 0 translation  2 0 1 scale 0.1 2 0.1 material color 255 127 0\n");
     write("create column2 cylinder transform rotation 90 0 0 translation -2 0 1 scale 0.1 2 0.1 material color 255 127 0\n");
-
-    connect(&socket, &QTcpSocket::disconnected, this, &Client::disconnect);
 }
 
-void Client::write(const QString &message) {
+void VisualClient::write(const QString &message) {
     if(socket.state()==QAbstractSocket::UnconnectedState) {
-        disconnect();
         return;
     }
 
     socket.write(message.toUtf8());
-
-    if(!socket.waitForBytesWritten()) {
-        disconnect();
-    }
+    socket.waitForBytesWritten();
 }
 
-void Client::draw(const Object::State &state) {
-    const double x = state.q(0);
-    const double y = state.q(1);
-    const double z = state.q(2);
-    const double phi = rad2deg*state.q(3);
-    const double theta = rad2deg*state.q(4);
-    const double psi = rad2deg*state.q(5);
+void VisualClient::callback(const Eigen::VectorX<double> &value) {
+    const Eigen::Vector<double, 6> q = value.segment(0, 6);
+
+    const double x = q(0);
+    const double y = q(1);
+    const double z = q(2);
+    const double phi = rad2deg*q(3);
+    const double theta = rad2deg*q(4);
+    const double psi = rad2deg*q(5);
 
     write(QString("update com transform translation %1 %2 %3\n").arg(x).arg(y).arg(z));
     write(QString("update com transform rotation    %1 %2 %3\n").arg(phi).arg(theta).arg(psi));

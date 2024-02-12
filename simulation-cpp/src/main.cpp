@@ -1,94 +1,98 @@
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-
+#include <fstream>
+#include <cstdlib>
 #include <QApplication>
-#include <QTimer>
+#include <QThread>
+#include <drake/systems/framework/diagram_builder.h>
+#include <drake/systems/analysis/simulator.h>
 
-#include "Client.h"
-#include "Chart.h"
-#include "GraphXY.h"
-#include "Simulation.h"
-#include "PFL.h"
-#include "TrajectoryGenerator.h"
-#include "Manual.h"
-#include "Lemniscate.h"
 #include "Circle.h"
+#include "Lemniscate.h"
+#include "PFL.h"
+#include "Plant.h"
+#include "VisualClient.h"
+#include "GraphXY.h"
+#include "Chart.h"
 
-TrajectoryGenerator<4> * createGenerator(int argc, char **argv) {
-	std::string contents;
+class Simulation : public QObject {
+    Q_OBJECT
 
-    for(int i=1; i<argc; i++) {
-        contents +=argv[i];
+	const drake::systems::System<double> &system;
 
-        if(i!=argc-1) {
-            contents +=' ';
-        }
-    }
+public:
+    Simulation(const drake::systems::System<double> &system) : system{system} {
 
-	std::istringstream stream(contents);
-
-	std::string type;
-	stream >> type;
-
-	if(type=="manual") {
-		return new Manual();
-	} else if(type=="lemniscate") {
-		float c, T;
-		stream >> c >> T;
-		return new Lemniscate(c, T);
-	} else if(type=="circle") {
-		float x, y, R, T;
-		stream >> x >> y >> R >> T;
-		return new Circle(x, y, R, T);
 	}
 
-	std::cerr << "undefined trajectory generator" << std::endl;
+public slots:
+    void run() {
+		drake::systems::Simulator<double> simulator(system);
+		simulator.set_target_realtime_rate(1);
+		simulator.get_mutable_integrator().request_initial_step_size_target(0.001);
+		simulator.get_mutable_integrator().set_requested_minimum_step_size(0.001);
+		simulator.get_mutable_integrator().set_throw_on_minimum_step_size_violation(false);
+		simulator.Initialize();
+		simulator.AdvanceTo(std::numeric_limits<double>::infinity());
+    }
+};
 
-	return nullptr;
+void save(const drake::systems::Diagram<double> &diagram) {
+	std::ofstream file("diagram.dot");
+    file << diagram.GetGraphvizString();
+    file.close();
+    system("dot -Tsvg diagram.dot -o diagram.svg");
 }
 
 int main(int argc, char **argv) {
 	QApplication app(argc, argv);
 
-	Simulation simulation(
-		new PFL(),
-		createGenerator(argc, argv)
-	);
+	drake::systems::DiagramBuilder<double> builder;
 
-	Client client;
-	Chart chartAlpha("Thrust Vanes Angles", "α [°]", "%+.1f", -15, 15);
-	Chart chartOmega("Rotor Angular Velocity", "ω [rad/s]", "%.0f", 0, 2000);
-	GraphXY graph("XY Trajectory", "%+.1f", 4);
+	//TrajectoryGenerator *generator = builder.AddSystem<Circle>(0, 0, 2, 5);
+	TrajectoryGenerator *generator = builder.AddSystem<Lemniscate>(2, 10);
+	Controller *controller = builder.AddSystem<PFL>();
+	Plant *plant = builder.AddSystem<Plant>();
+	VisualClient *client = builder.AddSystem<VisualClient>();
+	GraphXY *trajectory_xy = builder.AddSystem<GraphXY>("trajectory XY", "%+4.1f", 4);
+	Chart *actuators_rotor = builder.AddSystem<Chart>("rotor", "velocity [rad/s]", "%4.0f", 0, 2000);
+	Chart *actuators_vanes = builder.AddSystem<Chart>("thrust vanes", "angle [deg]", "%+3.0f", -10, 10);
 
-	Chart::Series alpha1(chartAlpha, Qt::red);
-	Chart::Series alpha2(chartAlpha, Qt::green);
-	Chart::Series alpha3(chartAlpha, Qt::blue);
-	Chart::Series alpha4(chartAlpha, Qt::magenta);
-	Chart::Series omega(chartOmega);
-	GraphXY::Series trajectory(graph, Qt::black, Qt::DashLine, 1);
-	GraphXY::Series position(graph, Qt::red);
+	trajectory_xy->AddSeries("desired", Eigen::MatrixX<double>({
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	}), Qt::black, Qt::DashLine, 1);
+	trajectory_xy->AddSeries("current", Eigen::MatrixX<double>({
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	}), Qt::red, Qt::SolidLine, 2);
+	actuators_rotor->AddSeries("rotor", Eigen::Vector<double, 5>({1, 0, 0, 0, 0}), Qt::black, Qt::SolidLine, 2);
+	actuators_vanes->AddSeries("vane_1", Eigen::Vector<double, 5>({0, 1, 0, 0, 0})*57.2957, Qt::red, Qt::SolidLine, 2);
+	actuators_vanes->AddSeries("vane_2", Eigen::Vector<double, 5>({0, 0, 1, 0, 0})*57.2957, Qt::green, Qt::SolidLine, 2);
+	actuators_vanes->AddSeries("vane_3", Eigen::Vector<double, 5>({0, 0, 0, 1, 0})*57.2957, Qt::blue, Qt::SolidLine, 2);
+	actuators_vanes->AddSeries("vane_4", Eigen::Vector<double, 5>({0, 0, 0, 0, 1})*57.2957, Qt::magenta, Qt::SolidLine, 2);
 
-	QTimer timer;
+	builder.Connect(generator->get_output_port(), controller->GetInputPort("trajectory"));
+	builder.Connect(generator->get_output_port(), trajectory_xy->GetInputPort("desired"));
+	builder.Connect(plant->get_output_port(), controller->GetInputPort("state"));
+	builder.Connect(controller->get_output_port(), plant->get_input_port());
+	builder.Connect(controller->get_output_port(), actuators_rotor->GetInputPort("rotor"));
+	builder.Connect(controller->get_output_port(), actuators_vanes->GetInputPort("vane_1"));
+	builder.Connect(controller->get_output_port(), actuators_vanes->GetInputPort("vane_2"));
+	builder.Connect(controller->get_output_port(), actuators_vanes->GetInputPort("vane_3"));
+	builder.Connect(controller->get_output_port(), actuators_vanes->GetInputPort("vane_4"));
+	builder.Connect(plant->get_output_port(), client->get_input_port());
+	builder.Connect(plant->get_output_port(), trajectory_xy->GetInputPort("current"));
 
-    QObject::connect(&timer, &QTimer::timeout, [&](){
+	std::unique_ptr<drake::systems::Diagram<double>> diagram = builder.Build();
 
-		const Simulation::Result result = simulation.read();
+	save(*diagram);
 
-		constexpr double rad2deg = 180/3.1415;
+	Simulation simulation(*diagram);
+    QThread simulationThread;
+    simulation.moveToThread(&simulationThread);
+    QObject::connect(&simulationThread, &QThread::started, &simulation, &Simulation::run);
+    simulationThread.start();
 
-		alpha1.append(result.control.alpha[0]*rad2deg);
-		alpha2.append(result.control.alpha[1]*rad2deg);
-		alpha3.append(result.control.alpha[2]*rad2deg);
-		alpha4.append(result.control.alpha[3]*rad2deg);
-		omega.append(result.control.omega);
-		trajectory.append(result.desired.y(0), result.desired.y(1));
-		position.append(result.state.q(0), result.state.q(1));
-
-		client.draw(result.state);
-    });
-
-	timer.start(20);
-
-	return app.exec();
+    return app.exec();
 }
+
+#include "main.moc"
