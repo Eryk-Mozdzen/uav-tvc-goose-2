@@ -11,13 +11,13 @@ GraphXY::GraphXY(const QString title, const QString format, const float range) :
     chart->legend()->hide();
 
     axisX = new QtCharts::QValueAxis(this);
-    axisX->setTitleText("X [m]");
+    axisX->setTitleText("X");
     axisX->setLabelFormat(format);
     axisX->setRange(-range, range);
     chart->addAxis(axisX, Qt::AlignBottom);
 
     axisY = new QtCharts::QValueAxis(this);
-    axisY->setTitleText("Y [m]");
+    axisY->setTitleText("Y");
     axisY->setLabelFormat(format);
     axisY->setRange(-range, range);
     chart->addAxis(axisY, Qt::AlignLeft);
@@ -34,15 +34,13 @@ GraphXY::GraphXY(const QString title, const QString format, const float range) :
 void GraphXY::AddSeries(const QString name, const Eigen::MatrixX<double> selector, const QColor color, const Qt::PenStyle style, const int width) {
     Series s;
     s.series = new QtCharts::QLineSeries();
-
     chart->addSeries(s.series);
-
     s.series->setPen(QPen(color, width, style));
     s.series->attachAxis(axisX);
     s.series->attachAxis(axisY);
 
     s.selector = selector;
-    s.port = this->DeclareVectorInputPort(name.toStdString(), selector.cols()).get_index();
+    s.port = DeclareVectorInputPort(name.toStdString(), selector.cols()).get_index();
 
     series.push_back(s);
 }

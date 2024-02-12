@@ -33,17 +33,42 @@ Chart::Chart(const QString title, const QString yLabel, const QString yFormat, c
 void Chart::AddSeries(const QString name, const Eigen::VectorX<double> selector, const QColor color, const Qt::PenStyle style, const int width) {
     Series s;
     s.series = new QtCharts::QLineSeries();
-
     chart->addSeries(s.series);
-
     s.series->setPen(QPen(color, width, style));
     s.series->attachAxis(axisX);
     s.series->attachAxis(axisY);
 
     s.selector = selector;
-    s.port = this->DeclareVectorInputPort(name.toStdString(), selector.size()).get_index();
+    s.port = DeclareVectorInputPort(name.toStdString(), selector.size()).get_index();
 
     series.push_back(s);
+}
+
+void Chart::AddSeries(const QString name, const Eigen::MatrixX<double> selector) {
+    const int num = selector.rows();
+    const drake::systems::InputPortIndex port = DeclareVectorInputPort(name.toStdString(), selector.cols()).get_index();
+
+    const std::vector<QColor> colors = {
+        Qt::red,
+        Qt::green,
+        Qt::blue,
+        Qt::magenta,
+        Qt::cyan
+    };
+
+    for(int i=0; i<num; i++) {
+        Series s;
+        s.series = new QtCharts::QLineSeries();
+        chart->addSeries(s.series);
+        s.series->setPen(QPen(colors.at(i), 2));
+        s.series->attachAxis(axisX);
+        s.series->attachAxis(axisY);
+
+        s.selector = selector.row(i);
+        s.port = port;
+
+        series.push_back(s);
+    }
 }
 
 drake::systems::EventStatus Chart::update(const drake::systems::Context<double> &context, drake::systems::State<double> *state) const {

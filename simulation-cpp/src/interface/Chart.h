@@ -29,4 +29,5 @@ public:
     Chart(const QString title, const QString yLabel, const QString yFormat, const float yMin, const float yMax);
 
     void AddSeries(const QString name, const Eigen::VectorX<double> selector, const QColor color, const Qt::PenStyle style, const int width);
+    void AddSeries(const QString name, const Eigen::MatrixX<double> selector);
 };
