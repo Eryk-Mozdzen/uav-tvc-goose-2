@@ -1,7 +1,7 @@
 #include <fstream>
 #include <cstdlib>
+#include <thread>
 #include <QApplication>
-#include <QThread>
 #include <drake/systems/framework/diagram_builder.h>
 #include <drake/systems/analysis/simulator.h>
 
@@ -12,28 +12,6 @@
 #include "VisualClient.h"
 #include "GraphXY.h"
 #include "Chart.h"
-
-class Simulation : public QObject {
-    Q_OBJECT
-
-	const drake::systems::System<double> &system;
-
-public:
-    Simulation(const drake::systems::System<double> &system) : system{system} {
-
-	}
-
-public slots:
-    void run() {
-		drake::systems::Simulator<double> simulator(system);
-		simulator.set_target_realtime_rate(1);
-		simulator.get_mutable_integrator().request_initial_step_size_target(0.001);
-		simulator.get_mutable_integrator().set_requested_minimum_step_size(0.001);
-		simulator.get_mutable_integrator().set_throw_on_minimum_step_size_violation(false);
-		simulator.Initialize();
-		simulator.AdvanceTo(std::numeric_limits<double>::infinity());
-    }
-};
 
 void save(const drake::systems::Diagram<double> &diagram) {
 	std::ofstream file("diagram.dot");
@@ -54,7 +32,7 @@ int main(int argc, char **argv) {
 	VisualClient *client = builder.AddSystem<VisualClient>();
 	GraphXY *trajectory_xy = builder.AddSystem<GraphXY>("trajectory XY", "%+2.0f", 4);
 	Chart *actuators_rotor = builder.AddSystem<Chart>("rotor", "velocity [rad/s]", "%4.0f", 0, 2000);
-	Chart *actuators_vanes = builder.AddSystem<Chart>("thrust vanes", "angle [deg]", "%+3.0f", -10, 10);
+	Chart *actuators_vanes = builder.AddSystem<Chart>("vanes", "angle [deg]", "%+3.0f", -10, 10);
 
 	trajectory_xy->AddSeries("desired", Eigen::Matrix<double, 2, 12>({
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -74,24 +52,25 @@ int main(int argc, char **argv) {
 
 	builder.Connect(generator->get_output_port(), controller->GetInputPort("trajectory"));
 	builder.Connect(generator->get_output_port(), trajectory_xy->GetInputPort("desired"));
-	builder.Connect(plant->get_output_port(), controller->GetInputPort("state"));
 	builder.Connect(controller->get_output_port(), plant->get_input_port());
 	builder.Connect(controller->get_output_port(), actuators_rotor->GetInputPort("rotor"));
 	builder.Connect(controller->get_output_port(), actuators_vanes->GetInputPort("vanes"));
-	builder.Connect(plant->get_output_port(), client->get_input_port());
+	builder.Connect(plant->get_output_port(), controller->GetInputPort("state"));
 	builder.Connect(plant->get_output_port(), trajectory_xy->GetInputPort("current"));
+	builder.Connect(plant->get_output_port(), client->get_input_port());
 
 	std::unique_ptr<drake::systems::Diagram<double>> diagram = builder.Build();
 
 	save(*diagram);
 
-	Simulation simulation(*diagram);
-    QThread simulationThread;
-    simulation.moveToThread(&simulationThread);
-    QObject::connect(&simulationThread, &QThread::started, &simulation, &Simulation::run);
-    simulationThread.start();
+	drake::systems::Simulator<double> simulator(*diagram);
+	simulator.set_target_realtime_rate(1);
+	simulator.get_mutable_integrator().request_initial_step_size_target(0.001);
+	simulator.get_mutable_integrator().set_requested_minimum_step_size(0.001);
+	simulator.get_mutable_integrator().set_throw_on_minimum_step_size_violation(false);
+	simulator.Initialize();
 
-    return app.exec();
+	std::thread thread(&drake::systems::Simulator<double>::AdvanceTo, &simulator, std::numeric_limits<double>::infinity());
+
+	return app.exec();
 }
-
-#include "main.moc"

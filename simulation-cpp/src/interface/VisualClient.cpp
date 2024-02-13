@@ -5,7 +5,8 @@
 
 #include "VisualClient.h"
 
-VisualClient::VisualClient() : VisualizationSink<VisualClient>(30, 12, this) {
+VisualClient::VisualClient() {
+    queue = std::make_unique<SharedQueue<Eigen::VectorXd>>();
 
     socket.connectToHost(QHostAddress::LocalHost, port);
 
@@ -41,6 +42,28 @@ VisualClient::VisualClient() : VisualizationSink<VisualClient>(30, 12, this) {
 
     write("create column1 cylinder transform rotation 90 0 0 translation  2 0 1 scale 0.1 2 0.1 material color 255 127 0\n");
     write("create column2 cylinder transform rotation 90 0 0 translation -2 0 1 scale 0.1 2 0.1 material color 255 127 0\n");
+
+    QObject::connect(&timer, &QTimer::timeout, [this]() {
+        while(queue->size()>0) {
+            const Eigen::VectorXd state = queue->front();
+            const Eigen::VectorXd q = state.segment(0, 6);
+
+            const double x = q(0);
+            const double y = q(1);
+            const double z = q(2);
+            const double phi = rad2deg*q(3);
+            const double theta = rad2deg*q(4);
+            const double psi = rad2deg*q(5);
+
+            write(QString("update com transform translation %1 %2 %3 rotation %4 %5 %6\n").arg(x).arg(y).arg(z).arg(phi).arg(theta).arg(psi));
+
+            queue->pop_front();
+        }
+    });
+    timer.start(1000*period);
+
+    DeclareVectorInputPort("state", 12);
+    DeclarePeriodicPublishEvent(period, 0, &VisualClient::update);
 }
 
 void VisualClient::write(const QString &message) {
@@ -52,16 +75,10 @@ void VisualClient::write(const QString &message) {
     socket.waitForBytesWritten();
 }
 
-void VisualClient::callback(const Eigen::VectorX<double> &value) {
-    const Eigen::Vector<double, 6> q = value.segment(0, 6);
+drake::systems::EventStatus VisualClient::update(const drake::systems::Context<double> &context) const {
+    const Eigen::VectorXd state = EvalVectorInput(context, 0)->CopyToVector();
 
-    const double x = q(0);
-    const double y = q(1);
-    const double z = q(2);
-    const double phi = rad2deg*q(3);
-    const double theta = rad2deg*q(4);
-    const double psi = rad2deg*q(5);
+    queue->push_back(state);
 
-    write(QString("update com transform translation %1 %2 %3\n").arg(x).arg(y).arg(z));
-    write(QString("update com transform rotation    %1 %2 %3\n").arg(phi).arg(theta).arg(psi));
+    return drake::systems::EventStatus::Succeeded();
 }

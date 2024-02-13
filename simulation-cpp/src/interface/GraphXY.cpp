@@ -1,5 +1,6 @@
 #include <QChartView>
 #include <QLegend>
+#include <QTimer>
 
 #include "GraphXY.h"
 
@@ -28,12 +29,32 @@ GraphXY::GraphXY(const QString title, const QString format, const float range) :
 
     show();
 
-    DeclarePeriodicUnrestrictedUpdateEvent(period, 0, &GraphXY::update);
+    QTimer *timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, [this]() {
+        for(Series &s : series) {
+            while(s.series->count()>samples) {
+                s.series->remove(0);
+            }
+
+            while(s.queue->size()>0) {
+                const Eigen::Vector2d point = s.queue->front();
+                const double x = point(0);
+                const double y = point(1);
+
+                s.series->append(x, y);
+                s.queue->pop_front();
+            }
+        }
+    });
+    timer->start(1000*period);
+
+    DeclarePeriodicPublishEvent(period, 0, &GraphXY::update);
 }
 
 void GraphXY::AddSeries(const QString name, const Eigen::MatrixX<double> selector, const QColor color, const Qt::PenStyle style, const int width) {
     Series s;
     s.series = new QtCharts::QLineSeries();
+    s.queue = std::make_unique<SharedQueue<Eigen::Vector2d>>();
     chart->addSeries(s.series);
     s.series->setPen(QPen(color, width, style));
     s.series->attachAxis(axisX);
@@ -42,24 +63,16 @@ void GraphXY::AddSeries(const QString name, const Eigen::MatrixX<double> selecto
     s.selector = selector;
     s.port = DeclareVectorInputPort(name.toStdString(), selector.cols()).get_index();
 
-    series.push_back(s);
+    series.push_back(std::move(s));
 }
 
-drake::systems::EventStatus GraphXY::update(const drake::systems::Context<double> &context, drake::systems::State<double> *state) const {
-    (void)state;
+drake::systems::EventStatus GraphXY::update(const drake::systems::Context<double> &context) const {
 
     for(const Series &s : series) {
-        const Eigen::VectorX<double> &input = EvalVectorInput(context, s.port)->CopyToVector();
-        const Eigen::VectorX<double> &value = s.selector*input;
+        const Eigen::VectorXd input = EvalVectorInput(context, s.port)->CopyToVector();
+        const Eigen::Vector2d point = s.selector*input;
 
-        const double x = value(0);
-        const double y = value(1);
-
-        while(s.series->count()>samples) {
-            s.series->remove(0);
-        }
-
-        s.series->append(x, y);
+        s.queue->push_back(point);
     }
 
     return drake::systems::EventStatus::Succeeded();

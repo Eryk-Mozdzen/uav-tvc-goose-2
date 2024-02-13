@@ -36,6 +36,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE
+	-std=c++20
 	-Wall
 	-Wextra
 	-Wpedantic

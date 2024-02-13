@@ -1,5 +1,6 @@
 #include <QChartView>
 #include <QLegend>
+#include <QTimer>
 
 #include "Chart.h"
 
@@ -27,12 +28,33 @@ Chart::Chart(const QString title, const QString yLabel, const QString yFormat, c
 
     show();
 
-    DeclarePeriodicUnrestrictedUpdateEvent(period, 0, &Chart::update);
+    QTimer *timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, [this]() {
+        for(Series &s : series) {
+            while(s.series->count()>samples) {
+                s.series->remove(0);
+            }
+
+            while(s.queue->size()>0) {
+                const Eigen::Vector2d point = s.queue->front();
+                const double time = point(0);
+                const double value = point(1);
+
+                axisX->setRange(time - horizion, time);
+                s.series->append(time, value);
+                s.queue->pop_front();
+            }
+        }
+    });
+    timer->start(1000*period);
+
+    DeclarePeriodicPublishEvent(period, 0, &Chart::update);
 }
 
-void Chart::AddSeries(const QString name, const Eigen::VectorX<double> selector, const QColor color, const Qt::PenStyle style, const int width) {
+void Chart::AddSeries(const QString name, const Eigen::VectorXd selector, const QColor color, const Qt::PenStyle style, const int width) {
     Series s;
     s.series = new QtCharts::QLineSeries();
+    s.queue = std::make_unique<SharedQueue<Eigen::Vector2d>>();
     chart->addSeries(s.series);
     s.series->setPen(QPen(color, width, style));
     s.series->attachAxis(axisX);
@@ -41,10 +63,10 @@ void Chart::AddSeries(const QString name, const Eigen::VectorX<double> selector,
     s.selector = selector;
     s.port = DeclareVectorInputPort(name.toStdString(), selector.size()).get_index();
 
-    series.push_back(s);
+    series.push_back(std::move(s));
 }
 
-void Chart::AddSeries(const QString name, const Eigen::MatrixX<double> selector) {
+void Chart::AddSeries(const QString name, const Eigen::MatrixXd selector) {
     const int num = selector.rows();
     const drake::systems::InputPortIndex port = DeclareVectorInputPort(name.toStdString(), selector.cols()).get_index();
 
@@ -58,7 +80,8 @@ void Chart::AddSeries(const QString name, const Eigen::MatrixX<double> selector)
 
     for(int i=0; i<num; i++) {
         Series s;
-        s.series = new QtCharts::QLineSeries();
+        s.series = new QtCharts::QLineSeries(this);
+        s.queue = std::make_unique<SharedQueue<Eigen::Vector2d>>();
         chart->addSeries(s.series);
         s.series->setPen(QPen(colors.at(i), 2));
         s.series->attachAxis(axisX);
@@ -67,26 +90,18 @@ void Chart::AddSeries(const QString name, const Eigen::MatrixX<double> selector)
         s.selector = selector.row(i);
         s.port = port;
 
-        series.push_back(s);
+        series.push_back(std::move(s));
     }
 }
 
-drake::systems::EventStatus Chart::update(const drake::systems::Context<double> &context, drake::systems::State<double> *state) const {
-    (void)state;
-
-    const double t = context.get_time();
-
-    axisX->setRange(t - horizion, t);
+drake::systems::EventStatus Chart::update(const drake::systems::Context<double> &context) const {
+    const double time = context.get_time();
 
     for(const Series &s : series) {
-        const Eigen::VectorX<double> &input = EvalVectorInput(context, s.port)->CopyToVector();
+        const Eigen::VectorXd &input = EvalVectorInput(context, s.port)->CopyToVector();
         const double value = s.selector.dot(input);
 
-        while(s.series->count()>samples) {
-            s.series->remove(0);
-        }
-
-        s.series->append(t, value);
+        s.queue->push_back(Eigen::Vector2d({time, value}));
     }
 
     return drake::systems::EventStatus::Succeeded();
