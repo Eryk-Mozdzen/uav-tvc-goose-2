@@ -7,6 +7,7 @@
 
 #include "Circle.h"
 #include "Lemniscate.h"
+#include "Manual.h"
 #include "PFL.h"
 #include "Plant.h"
 #include "VisualClient.h"
@@ -25,14 +26,15 @@ int main(int argc, char **argv) {
 
 	drake::systems::DiagramBuilder<double> builder;
 
-	//TrajectoryGenerator *generator = builder.AddSystem<Circle>(0, 0, 2, 5);
-	TrajectoryGenerator *generator = builder.AddSystem<Lemniscate>(2, 10);
-	Controller *controller = builder.AddSystem<PFL>();
-	Plant *plant = builder.AddSystem<Plant>();
-	VisualClient *client = builder.AddSystem<VisualClient>();
-	GraphXY *trajectory_xy = builder.AddSystem<GraphXY>("trajectory XY", "%+2.0f", 4);
-	Chart *actuators_rotor = builder.AddSystem<Chart>("rotor", "velocity [rad/s]", "%4.0f", 0, 2000);
-	Chart *actuators_vanes = builder.AddSystem<Chart>("vanes", "angle [deg]", "%+3.0f", -10, 10);
+	//auto generator = builder.AddSystem<Circle>(0, 0, 2, 5);
+	auto generator = builder.AddSystem<Lemniscate>(2, 10);
+	//auto generator = builder.AddSystem<Manual>();
+	auto controller = builder.AddSystem<PFL>();
+	auto plant = builder.AddSystem<Plant>();
+	auto client = builder.AddSystem<VisualClient>();
+	auto trajectory_xy = builder.AddSystem<GraphXY>("trajectory XY", "%+2.0f", 4);
+	auto actuators_rotor = builder.AddSystem<Chart>("rotor", "velocity [rad/s]", "%4.0f", 0, 2000);
+	auto actuators_vanes = builder.AddSystem<Chart>("vanes", "angle [deg]", "%+3.0f", -10, 10);
 
 	trajectory_xy->AddSeries("desired", Eigen::Matrix<double, 2, 12>({
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -59,7 +61,7 @@ int main(int argc, char **argv) {
 	builder.Connect(plant->get_output_port(), trajectory_xy->GetInputPort("current"));
 	builder.Connect(plant->get_output_port(), client->get_input_port());
 
-	std::unique_ptr<drake::systems::Diagram<double>> diagram = builder.Build();
+	auto diagram = builder.Build();
 
 	save(*diagram);
 
@@ -68,6 +70,7 @@ int main(int argc, char **argv) {
 	simulator.get_mutable_integrator().request_initial_step_size_target(0.001);
 	simulator.get_mutable_integrator().set_requested_minimum_step_size(0.001);
 	simulator.get_mutable_integrator().set_throw_on_minimum_step_size_violation(false);
+	simulator.get_mutable_integrator().set_maximum_step_size(0.01);
 	simulator.Initialize();
 
 	std::thread thread(&drake::systems::Simulator<double>::AdvanceTo, &simulator, std::numeric_limits<double>::infinity());

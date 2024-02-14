@@ -1,54 +1,27 @@
+#include <drake/systems/framework/diagram_builder.h>
+#include <drake/systems/primitives/integrator.h>
+#include <drake/systems/primitives/discrete_derivative.h>
+#include <drake/systems/primitives/multiplexer.h>
+
 #include "Manual.h"
+#include "Gamepad.h"
 
-Manual::Manual() : running{true}, thread{&Manual::loop, this} {
+Manual::Manual() {
 
+    drake::systems::DiagramBuilder<double> builder;
+
+    auto gamepad = builder.AddSystem<Gamepad>();
+    auto integrator = builder.AddSystem<drake::systems::Integrator>(4);
+    auto derivative = builder.AddSystem<drake::systems::DiscreteDerivative>(4, 0.01);
+    auto mux = builder.AddSystem<drake::systems::Multiplexer>(std::vector<int>{4, 4, 4});
+
+    builder.Connect(gamepad->get_output_port(), integrator->get_input_port());
+    builder.Connect(gamepad->get_output_port(), derivative->get_input_port());
+    builder.Connect(gamepad->get_output_port(), mux->get_input_port(1));
+    builder.Connect(integrator->get_output_port(), mux->get_input_port(0));
+    builder.Connect(derivative->get_output_port(), mux->get_input_port(2));
+
+    builder.ExportOutput(mux->get_output_port(), "trajectory");
+
+    builder.BuildInto(this);
 }
-
-Manual::~Manual() {
-    mutex.lock();
-    running = false;
-    mutex.unlock();
-
-    if(thread.joinable()) {
-        thread.join();
-    }
-}
-
-void Manual::loop() {
-    while(true) {
-        const Eigen::Vector<double, 4> input {
-            +gamepad.get(Gamepad::Analog::LX),
-            -gamepad.get(Gamepad::Analog::LY),
-            -gamepad.get(Gamepad::Analog::RY),
-            +gamepad.get(Gamepad::Analog::RX)
-        };
-
-        mutex.lock();
-
-        if(!running) {
-            return;
-        }
-
-        const Eigen::Vector<double, 4> last = trajectory.dy;
-
-        trajectory.y +=0.5*(input + last)*dt;
-        trajectory.dy = input;
-        //trajectory.ddy = (input - last)/dt;
-
-        mutex.unlock();
-
-        std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(dt)));
-    }
-}
-
-Manual::Trajectory Manual::get(const double time) {
-    (void)time;
-
-    mutex.lock();
-
-    const Trajectory copy = trajectory;
-
-    mutex.unlock();
-
-    return copy;
-};

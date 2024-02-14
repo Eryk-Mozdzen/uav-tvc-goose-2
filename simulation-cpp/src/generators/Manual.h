@@ -1,26 +1,8 @@
 #pragma once
 
-#include <thread>
-#include <mutex>
+#include <drake/systems/framework/diagram.h>
 
-#include "TrajectoryGenerator.h"
-#include "Gamepad.h"
-
-class Manual : public TrajectoryGenerator<4> {
-    static constexpr double dt = 0.05;
-
-    Gamepad gamepad;
-    Trajectory trajectory;
-
-    bool running;
-    std::thread thread;
-    std::mutex mutex;
-
-    void loop();
-
+class Manual : public drake::systems::Diagram<double> {
 public:
     Manual();
-    ~Manual();
-
-    Trajectory get(const double time);
 };

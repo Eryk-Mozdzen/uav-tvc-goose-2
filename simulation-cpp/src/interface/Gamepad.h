@@ -1,12 +1,17 @@
 #pragma once
 
+#include <mutex>
+#include <array>
 #include <QObject>
-#include <QMutex>
+#include <drake/systems/framework/leaf_system.h>
 
-class Gamepad : public QObject {
+class Gamepad : public QObject, public drake::systems::LeafSystem<double> {
     Q_OBJECT
 
-public:
+    std::array<float, 6> analog;
+    std::array<bool, 15> digital;
+    std::unique_ptr<std::mutex> mutex;
+
     enum Analog {
         LX,
         LY,
@@ -34,17 +39,12 @@ public:
         HOME
     };
 
-    Gamepad(QObject *parent=nullptr);
-
-    float get(Analog input);
-    bool get(Digital input);
+    void EvalAnalog(const drake::systems::Context<double> &context, drake::systems::BasicVector<double> *output) const;
 
 private slots:
     void updateA(const Analog input, const float value);
     void updateD(const Digital input, const bool value);
 
-private:
-    QVector<float> analog;
-    QVector<bool> digital;
-    QMutex mutex;
+public:
+    Gamepad(QObject *parent=nullptr);
 };

@@ -19,11 +19,13 @@ add_executable(${PROJECT_NAME}
 	"src/base/Controller.cpp"
 	"src/generators/Circle.cpp"
 	"src/generators/Lemniscate.cpp"
+	"src/generators/Manual.cpp"
 	"src/controllers/PFL.cpp"
 	"src/plant/Plant.cpp"
 	"src/interface/VisualClient.cpp"
 	"src/interface/GraphXY.cpp"
 	"src/interface/Chart.cpp"
+	"src/interface/Gamepad.cpp"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
