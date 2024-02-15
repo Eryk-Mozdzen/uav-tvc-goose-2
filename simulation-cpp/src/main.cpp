@@ -1,10 +1,9 @@
 #include <fstream>
-#include <cstdlib>
 #include <thread>
 #include <QApplication>
 #include <drake/systems/framework/diagram_builder.h>
-#include <drake/systems/analysis/simulator.h>
 
+#include "Simulator.h"
 #include "Circle.h"
 #include "Lemniscate.h"
 #include "Manual.h"
@@ -13,13 +12,6 @@
 #include "VisualClient.h"
 #include "GraphXY.h"
 #include "Chart.h"
-
-void save(const drake::systems::Diagram<double> &diagram) {
-	std::ofstream file("diagram.dot");
-    file << diagram.GetGraphvizString();
-    file.close();
-    system("dot -Tsvg diagram.dot -o diagram.svg");
-}
 
 int main(int argc, char **argv) {
 	QApplication app(argc, argv);
@@ -63,17 +55,18 @@ int main(int argc, char **argv) {
 
 	auto diagram = builder.Build();
 
-	save(*diagram);
+	std::ofstream file("diagram.dot");
+    file << diagram->GetGraphvizString();
+    file.close();
 
-	drake::systems::Simulator<double> simulator(*diagram);
+	Simulator<double> simulator(*diagram);
 	simulator.set_target_realtime_rate(1);
 	simulator.get_mutable_integrator().request_initial_step_size_target(0.001);
 	simulator.get_mutable_integrator().set_requested_minimum_step_size(0.001);
 	simulator.get_mutable_integrator().set_throw_on_minimum_step_size_violation(false);
 	simulator.get_mutable_integrator().set_maximum_step_size(0.01);
 	simulator.Initialize();
-
-	std::thread thread(&drake::systems::Simulator<double>::AdvanceTo, &simulator, std::numeric_limits<double>::infinity());
+	simulator.StartAdvance();
 
 	return app.exec();
 }

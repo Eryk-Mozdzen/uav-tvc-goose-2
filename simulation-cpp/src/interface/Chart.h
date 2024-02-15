@@ -12,7 +12,7 @@ class Chart : public QMainWindow, public drake::systems::LeafSystem<double> {
     static constexpr double horizion = 10;
     static constexpr double frequency = 20;
     static constexpr double period = 1/frequency;
-    static constexpr double samples = horizion*frequency;
+    static constexpr double samples = horizion*frequency + 1;
 
     struct Series {
         QtCharts::QLineSeries *series;
