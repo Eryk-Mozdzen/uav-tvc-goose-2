@@ -1,5 +1,4 @@
 #include <fstream>
-#include <thread>
 #include <QApplication>
 #include <drake/systems/framework/diagram_builder.h>
 
