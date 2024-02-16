@@ -7,7 +7,7 @@
 #include "Circle.h"
 #include "Lemniscate.h"
 #include "Manual.h"
-#include "PFL.h"
+#include "Simple2.h"
 #include "Plant.h"
 #include "VisualClient.h"
 #include "GraphXY.h"
@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 	//auto generator = builder.AddSystem<Circle>(0, 0, 2, 5);
 	auto generator = builder.AddSystem<Lemniscate>(2, 10);
 	//auto generator = builder.AddSystem<Manual>();
-	auto controller = builder.AddSystem<PFL>();
+	auto controller = builder.AddSystem<Simple2>();
 	auto plant = builder.AddSystem<Plant>();
 	auto client = builder.AddSystem<VisualClient>();
 	auto trajectory_xy = builder.AddSystem<GraphXY>("trajectory XY", "%+2.0f", 4);
@@ -44,12 +44,12 @@ int main(int argc, char **argv) {
 		{0, 0, 0, 0, 1}
 	})*57.2957);
 
-	builder.Connect(generator->get_output_port(), controller->GetInputPort("trajectory"));
+	builder.Connect(generator->get_output_port(), controller->get_trajectory_input_port());
 	builder.Connect(generator->get_output_port(), trajectory_xy->GetInputPort("desired"));
-	builder.Connect(controller->get_output_port(), plant->get_input_port());
-	builder.Connect(controller->get_output_port(), actuators_rotor->GetInputPort("rotor"));
-	builder.Connect(controller->get_output_port(), actuators_vanes->GetInputPort("vanes"));
-	builder.Connect(plant->get_output_port(), controller->GetInputPort("state"));
+	builder.Connect(controller->get_control_output_port(), plant->get_input_port());
+	builder.Connect(controller->get_control_output_port(), actuators_rotor->GetInputPort("rotor"));
+	builder.Connect(controller->get_control_output_port(), actuators_vanes->GetInputPort("vanes"));
+	builder.Connect(plant->get_output_port(), controller->get_state_input_port());
 	builder.Connect(plant->get_output_port(), trajectory_xy->GetInputPort("current"));
 	builder.Connect(plant->get_output_port(), client->get_input_port());
 
@@ -61,10 +61,6 @@ int main(int argc, char **argv) {
 
 	Simulator<double> simulator(*diagram);
 	simulator.set_target_realtime_rate(1);
-	simulator.get_mutable_integrator().request_initial_step_size_target(0.001);
-	simulator.get_mutable_integrator().set_requested_minimum_step_size(0.001);
-	simulator.get_mutable_integrator().set_throw_on_minimum_step_size_violation(false);
-	simulator.get_mutable_integrator().set_maximum_step_size(0.01);
 	simulator.Initialize();
 	simulator.StartAdvance();
 
