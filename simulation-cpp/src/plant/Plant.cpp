@@ -241,25 +241,23 @@ Eigen::Matrix3d Plant::dW(const Q &q, const Q &dq) {
 }
 
 Eigen::Vector<double, 5> Plant::decodeControls(const Eigen::Vector<double, 4> &generalized) {
-    Eigen::Vector<double, 5> real;
+    const double Ft = generalized(0);
+    const double F31 = generalized(1);
+    const double F42 = generalized(2);
+    const double Fs = generalized(3);
 
-    real(0) = std::sqrt(generalized(0)/Params::K_w);
-
-    if(std::isnan(real(0))) {
-        real(0) = 0.001;
-    }
-
-    const double C31 = generalized(1)/(Params::K_l*generalized(0));
-    const double C42 = generalized(2)/(Params::K_l*generalized(0));
-    const double Cs = generalized(3)/(Params::K_l*generalized(0));
+    const double C31 = F31/(Params::K_l*Ft);
+    const double C42 = F42/(Params::K_l*Ft);
+    const double Cs = Fs/(Params::K_l*Ft);
     const double C = (Cs - C31 - C42)/2;
 
-    real(1) = (2*C - C31 + C42)/4;
-    real(2) = C - real(1);
-    real(3) = C31 + real(1);
-    real(4) = C42 + C - real(1);
+    const double w = std::sqrt(Ft/Params::K_w);
+    const double a1 = 0.25*(2*C - C31 + C42);
+    const double a2 = C - a1;
+    const double a3 = C31 + a1;
+    const double a4 = C42 + C - a1;
 
-    return real;
+    return {w, a1, a2, a3, a4};
 }
 
 Eigen::Vector<double, 4> Plant::encodeControls(const Eigen::Vector<double, 5> &real) {

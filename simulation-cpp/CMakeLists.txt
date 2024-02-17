@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.16)
 project(simulation-cpp)
 
 set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
 
 find_package(drake REQUIRED)
 find_package(Qt5 COMPONENTS
@@ -39,6 +38,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 target_compile_options(${PROJECT_NAME} PRIVATE
 	-std=c++20
+	-O3
 	-Wall
 	-Wextra
 	-Wpedantic

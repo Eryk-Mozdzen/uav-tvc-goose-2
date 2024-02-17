@@ -32,10 +32,6 @@ GraphXY::GraphXY(const QString title, const QString format, const float range) :
     QTimer *timer = new QTimer(this);
     connect(timer, &QTimer::timeout, [this]() {
         for(Series &s : series) {
-            while(s.series->count()>samples) {
-                s.series->remove(0);
-            }
-
             while(s.queue->size()>0) {
                 const Eigen::Vector2d point = s.queue->front();
                 const double x = point(0);
@@ -43,6 +39,10 @@ GraphXY::GraphXY(const QString title, const QString format, const float range) :
 
                 s.series->append(x, y);
                 s.queue->pop_front();
+            }
+
+            while(s.series->count()>samples) {
+                s.series->remove(0);
             }
         }
     });

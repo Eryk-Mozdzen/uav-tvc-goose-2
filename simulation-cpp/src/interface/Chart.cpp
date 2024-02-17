@@ -31,10 +31,6 @@ Chart::Chart(const QString title, const QString yLabel, const QString yFormat, c
     QTimer *timer = new QTimer(this);
     connect(timer, &QTimer::timeout, [this]() {
         for(Series &s : series) {
-            while(s.series->count()>samples) {
-                s.series->remove(0);
-            }
-
             while(s.queue->size()>0) {
                 const Eigen::Vector2d point = s.queue->front();
                 const double time = point(0);
@@ -43,6 +39,10 @@ Chart::Chart(const QString title, const QString yLabel, const QString yFormat, c
                 axisX->setRange(time - horizion, time);
                 s.series->append(time, value);
                 s.queue->pop_front();
+            }
+
+            while(s.series->count()>samples) {
+                s.series->remove(0);
             }
         }
     });

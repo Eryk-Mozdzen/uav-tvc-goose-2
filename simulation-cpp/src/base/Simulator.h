@@ -1,20 +1,20 @@
 #pragma once
 
+#include <atomic>
 #include <thread>
-#include <mutex>
 #include <drake/systems/analysis/simulator.h>
 
 template<typename T>
 class Simulator : public drake::systems::Simulator<T> {
+    std::atomic<bool> running = true;
 	std::thread thread;
-	std::mutex mutex;
-	bool running = true;
 
 	void run();
 
 public:
 	Simulator(const drake::systems::System<T> &system);
 	~Simulator();
+
 	void StartAdvance();
 };
 
@@ -25,23 +25,21 @@ Simulator<T>::Simulator(const drake::systems::System<T> &system) : drake::system
 
 template<typename T>
 Simulator<T>::~Simulator() {
-    mutex.lock();
     running = false;
-    mutex.unlock();
-    thread.join();
+
+    if(thread.joinable()) {
+        thread.join();
+    }
 }
 
 template<typename T>
 void Simulator<T>::StartAdvance() {
-    thread = std::thread(&Simulator::run, this);
+    thread = std::thread(&Simulator<T>::run, this);
 }
 
 template<typename T>
 void Simulator<T>::run() {
-    mutex.lock();
     while(running) {
-        mutex.unlock();
-        this->AdvanceTo(this->get_context().get_time() + 0.1);
-        mutex.lock();
+        this->AdvanceTo(this->get_context().get_time() + 1);
     }
 }
