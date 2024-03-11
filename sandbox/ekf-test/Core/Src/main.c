@@ -127,15 +127,28 @@ int main(void)
 	HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_1);
 	HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_2);
 
-	char str[256];
-	uint8_t buffer[1024];
+	uint8_t payload[256];
+	uint8_t buffer[256];
 
-  while(1) {
+	protocol_message_t message = {
+		.payload = payload,
+		.id = PROTOCOL_ID_LOG_DEBUG
+	};
+
+    while(1) {
 		//uint8_t byte;
 		//HAL_UART_Receive(&huart6, &byte, 1, HAL_MAX_DELAY);
 
-	  	const uint16_t len = sprintf(str, "witam: %lu", HAL_GetTick());
-	  	const uint16_t size = protocol_encode(PROTOCOL_ID_LOG_DEBUG, str, len, buffer);
+    	message.size = sprintf(message.payload, "witam: %lu", HAL_GetTick());
+
+	  	const uint16_t size = protocol_encode(buffer, &message);
+
+	  	/*char xd[256];
+    	for(uint16_t i=0; i<size; i++) {
+    		sprintf(xd + 3*i, "%02X ", buffer[i]);
+    	}
+    	sprintf(xd+3*size, "\n\r");
+    	HAL_UART_Transmit(&huart2, xd, strlen(xd), HAL_MAX_DELAY);*/
 
 		HAL_UART_Transmit(&huart2, buffer, size, HAL_MAX_DELAY);
 
