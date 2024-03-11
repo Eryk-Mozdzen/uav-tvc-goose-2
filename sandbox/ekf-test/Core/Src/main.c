@@ -29,6 +29,11 @@
 #include "protocol.h"
 #include "protocol_data.h"
 
+#include "mpu6050_regs.h"
+#include "hmc5883l_regs.h"
+#include "bmp280_regs.h"
+#include "bmp280_compensate.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -77,6 +82,57 @@ static void MX_TIM11_Init(void);
 /* USER CODE BEGIN 0 */
 
 float distance;
+
+void bmp280_write(uint8_t address, uint8_t value) {
+	HAL_I2C_Mem_Write(&hi2c2, BMP280_ADDR<<1, address, 1, &value, 1, HAL_MAX_DELAY);
+}
+
+void bmp280_init() {
+	bmp280_write(BMP280_REG_RESET,
+		BMP280_RESET_VALUE
+	);
+
+	bmp280_write(BMP280_REG_CTRL_MEAS,
+		BMP280_CTRL_TEMP_OVERSAMPLING_2 |
+		BMP280_CTRL_PRESS_OVERSAMPLING_16 |
+		BMP280_CTRL_MODE_NORMAL
+	);
+
+	bmp280_write(BMP280_REG_CONFIG,
+		BMP280_CONFIG_STANDBY_0_5MS |
+		BMP280_CONFIG_FILTER_X16 |
+		BMP280_CONFIG_SPI_3WIRE_DISABLE
+	);
+
+	uint8_t buffer[24] = {0};
+
+	HAL_I2C_Mem_Read(&hi2c2, BMP280_ADDR<<1, BMP280_REG_CALIB00, 1, buffer, sizeof(buffer), HAL_MAX_DELAY);
+
+	dig_T1 = (((uint16_t)buffer[1])<<8) | buffer[0];
+	dig_T2 = (((int16_t)buffer[3])<<8) | buffer[2];
+	dig_T3 = (((int16_t)buffer[5])<<8) | buffer[4];
+	dig_P1 = (((uint16_t)buffer[7])<<8) | buffer[6];
+	dig_P2 = (((int16_t)buffer[9])<<8) | buffer[8];
+	dig_P3 = (((int16_t)buffer[11])<<8) | buffer[10];
+	dig_P4 = (((int16_t)buffer[13])<<8) | buffer[12];
+	dig_P5 = (((int16_t)buffer[15])<<8) | buffer[14];
+	dig_P6 = (((int16_t)buffer[17])<<8) | buffer[16];
+	dig_P7 = (((int16_t)buffer[19])<<8) | buffer[18];
+	dig_P8 = (((int16_t)buffer[21])<<8) | buffer[20];
+	dig_P9 = (((int16_t)buffer[23])<<8) | buffer[22];
+}
+
+void bmp280_read(float *temperature, float *pressure) {
+	uint8_t buffer[6] = {0};
+
+	HAL_I2C_Mem_Read(&hi2c2, BMP280_ADDR<<1, BMP280_REG_PRESS_MSB, 1, buffer, sizeof(buffer), HAL_MAX_DELAY);
+
+	const int32_t raw_temperature  = (((int32_t)buffer[3])<<12) | (((int32_t)buffer[4])<<4) | (((int32_t)buffer[5])>>4);
+	const int32_t raw_pressure     = (((int32_t)buffer[0])<<12) | (((int32_t)buffer[1])<<4) | (((int32_t)buffer[2])>>4);
+
+	*temperature = bmp280_compensate_T_int32(raw_temperature)/100.f;	// *C
+	*pressure    = bmp280_compensate_P_int64(raw_pressure)/256.f;		// Pa
+}
 
 /* USER CODE END 0 */
 
@@ -127,19 +183,26 @@ int main(void)
 	HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_1);
 	HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_2);
 
-	uint8_t payload[256];
-	uint8_t buffer[256];
+	bmp280_init();
 
-	protocol_message_t message = {
-		.payload = payload,
-		.id = PROTOCOL_ID_LOG_DEBUG
-	};
+	uint8_t buffer[1024];
+
+	protocol_message_t message;
+	protocol_readings_t readings = {0};
 
     while(1) {
 		//uint8_t byte;
 		//HAL_UART_Receive(&huart6, &byte, 1, HAL_MAX_DELAY);
 
-    	message.size = sprintf(message.payload, "witam: %lu", HAL_GetTick());
+    	//message.size = sprintf(message.payload, "witam: %lu", HAL_GetTick());
+
+    	float temperature;
+    	bmp280_read(&temperature, &readings.barometer);
+    	readings.valid.barometer = 1;
+
+    	message.id = PROTOCOL_ID_READINGS;
+    	message.payload = &readings;
+    	message.size = sizeof(readings);
 
 	  	const uint16_t size = protocol_encode(buffer, &message);
 

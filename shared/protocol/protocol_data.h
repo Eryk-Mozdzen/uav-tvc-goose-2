@@ -2,25 +2,45 @@
 #define PROTOCOL_DATA_H
 
 #ifdef __cplusplus
-    extern "C" {
+extern "C" {
 #endif
 
 #include <stdint.h>
 
 typedef enum {
-    PROTOCOL_ID_LOG_ERROR,
-    PROTOCOL_ID_LOG_WARNING,
-    PROTOCOL_ID_LOG_INFO,
-    PROTOCOL_ID_LOG_DEBUG
+    PROTOCOL_ID_LOG,
+    PROTOCOL_ID_READINGS,
+    PROTOCOL_ID_ESTIMATION
 } protocol_id_t;
 
 typedef struct {
-    float pre[3];
-    float post[3];
-} protocol_sensor3d_t;
+    float magnetometer[3];
+    float accelerometer[3];
+    float gyroscope[3];
+    float rangefinder;
+    float barometer;
+    float gps[2];
+    union {
+        uint8_t magnetometer : 1;
+        uint8_t accelerometer : 1;
+        uint8_t gyroscope : 1;
+        uint8_t rangefinder : 1;
+        uint8_t barometer : 1;
+        uint8_t gps : 1;
+        uint8_t unused : 2;
+    } valid;
+} protocol_readings_t;
+
+typedef struct {
+    float position[3];
+    float velocity[3];
+    float orientation[4];
+    float angular_velocity[3];
+    float pressure_0;
+} protocol_estimation_t;
 
 #ifdef __cplusplus
-    }
+}
 #endif
 
 #endif

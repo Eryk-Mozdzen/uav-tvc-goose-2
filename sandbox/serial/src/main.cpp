@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "protocol.h"
+#include "protocol_data.h"
 
 int main() {
 
@@ -35,13 +36,20 @@ int main() {
 
 		for(int i=0; i<n; i++) {
 			if(protocol_decode(&decoder, serial[i], &message)) {
-				std::cout << std::string(reinterpret_cast<char *>(message.payload), message.size);
-			}
-
-			//std::cout << std::right << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int)serial[i] << " ";
-
-			if(serial[i]==0) {
-				std::cout << std::endl;
+				switch(message.id) {
+					case PROTOCOL_ID_LOG: {
+						std::cout << std::string(reinterpret_cast<char *>(message.payload), message.size) << std::endl;
+					} break;
+					case PROTOCOL_ID_READINGS: {
+						protocol_readings_t *readings = reinterpret_cast<protocol_readings_t *>(message.payload);
+						if(readings->valid.barometer) {
+							std::cout << readings->barometer << " Pa" << std::endl;
+						}
+					} break;
+					default: {
+						std::cout << "unknown id" << std::endl;
+					} break;
+				}
 			}
 		}
 	}
