@@ -1,21 +1,41 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
+#include <cmath>
 #include <fcntl.h>
 #include <unistd.h>
 
 #include "protocol.h"
 #include "protocol_data.h"
 
+std::ostream & operator<<(std::ostream &stream, const protocol_readings_t readings) {
+	stream << std::setprecision(0) << std::fixed << std::noshowpos << std::setw(10);
+	stream << (readings.valid.barometer ? readings.barometer : std::nan(""));
+	stream << " Pa   ";
+
+	stream << std::setprecision(2) << std::fixed << std::noshowpos << std::setw(5);
+	stream << (readings.valid.rangefinder ? readings.rangefinder : std::nan(""));
+	stream << " m   ";
+
+	stream << "[";
+	stream << std::setprecision(2) << std::fixed << std::showpos;
+	stream << std::setw(6) << (readings.valid.magnetometer ? readings.magnetometer[0] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.magnetometer ? readings.magnetometer[1] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.magnetometer ? readings.magnetometer[2] : std::nan(""));
+	stream << "] G   ";
+
+	return stream;
+}
+
 int main() {
 
-	int port = open("/dev/ttyACM0", O_RDWR);
+	int port = open("/dev/ttyACM0", O_RDONLY);
 	if(port<0) {
 		std::cerr << "can't open port" << std::endl;
 		return 1;
 	}
 
-	uint8_t serial[64];
+	uint8_t serial[256];
 	uint8_t buffer[1024];
 	uint8_t payload[1024];
 
@@ -42,9 +62,7 @@ int main() {
 					} break;
 					case PROTOCOL_ID_READINGS: {
 						protocol_readings_t *readings = reinterpret_cast<protocol_readings_t *>(message.payload);
-						if(readings->valid.barometer) {
-							std::cout << readings->barometer << " Pa" << std::endl;
-						}
+						std::cout << *readings << std::endl;
 					} break;
 					default: {
 						std::cout << "unknown id" << std::endl;

@@ -20,7 +20,7 @@ typedef struct {
     float rangefinder;
     float barometer;
     float gps[2];
-    union {
+    struct {
         uint8_t magnetometer : 1;
         uint8_t accelerometer : 1;
         uint8_t gyroscope : 1;
