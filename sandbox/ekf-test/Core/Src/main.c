@@ -242,6 +242,93 @@ void qmc5883l_read(float *mag) {
 	mag[2] = raw_z*gain;
 }
 
+void mpu6050_write(uint8_t address, uint8_t value) {
+	HAL_I2C_Mem_Write(&hi2c1, MPU6050_ADDR<<1, address, 1, &value, 1, 100);
+}
+
+void mpu6050_init() {
+	mpu6050_write(MPU6050_REG_PWR_MGMT_1,
+		MPU6050_PWR_MGMT_1_DEVICE_RESET
+	);
+
+	HAL_Delay(100);
+
+	mpu6050_write(MPU6050_REG_SIGNAL_PATH_RESET,
+		MPU6050_SIGNAL_PATH_RESET_GYRO |
+		MPU6050_SIGNAL_PATH_RESET_ACCEL |
+		MPU6050_SIGNAL_PATH_RESET_TEMP
+	);
+
+	HAL_Delay(100);
+
+	mpu6050_write(MPU6050_REG_INT_ENABLE,
+		MPU6050_INT_ENABLE_FIFO_OVERLOW_DISABLE |
+		MPU6050_INT_ENABLE_I2C_MST_INT_DISABLE |
+		MPU6050_INT_ENABLE_DATA_RDY_ENABLE
+	);
+
+	mpu6050_write(MPU6050_REG_INT_PIN_CFG,
+		MPU6050_INT_PIN_CFG_LEVEL_ACTIVE_HIGH |
+		MPU6050_INT_PIN_CFG_PUSH_PULL |
+		MPU6050_INT_PIN_CFG_PULSE |
+		MPU6050_INT_PIN_CFG_STATUS_CLEAR_AFTER_ANY |
+		MPU6050_INT_PIN_CFG_FSYNC_DISABLE |
+		MPU6050_INT_PIN_CFG_I2C_BYPASS_DISABLE
+	);
+
+	mpu6050_write(MPU6050_REG_PWR_MGMT_1,
+		MPU6050_PWR_MGMT_1_TEMP_DIS |
+		MPU6050_PWR_MGMT_1_CLOCK_INTERNAL
+	);
+
+	mpu6050_write(MPU6050_REG_CONFIG,
+		MPU6050_CONFIG_EXT_SYNC_DISABLED |
+		MPU6050_CONFIG_DLPF_SETTING_6
+	);
+
+	mpu6050_write(MPU6050_REG_ACCEL_CONFIG,
+		MPU6050_ACCEL_CONFIG_RANGE_4G
+	);
+
+	mpu6050_write(MPU6050_REG_GYRO_CONFIG,
+		MPU6050_GYRO_CONFIG_RANGE_500DPS
+	);
+
+	mpu6050_write(MPU6050_REG_SMPLRT_DIV, 4);
+}
+
+void mpu6050_read(float *acc, float *gyr) {
+	uint8_t buffer[14] = {0};
+
+	HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDR<<1, MPU6050_REG_ACCEL_XOUT_H, 1, buffer, sizeof(buffer), 100);
+
+	{
+		const int16_t raw_x = (((int16_t)buffer[8])<<8) | buffer[9];
+		const int16_t raw_y = (((int16_t)buffer[10])<<8) | buffer[11];
+		const int16_t raw_z = (((int16_t)buffer[12])<<8) | buffer[13];
+
+		const float gain = 65.5f;
+		const float dps_to_rads = 0.017453292519943f;
+
+		gyr[0] = raw_x*dps_to_rads/gain;
+		gyr[1] = raw_y*dps_to_rads/gain;
+		gyr[2] = raw_z*dps_to_rads/gain;
+	}
+
+	{
+		const int16_t raw_x = (((int16_t)buffer[0])<<8) | buffer[1];
+		const int16_t raw_y = (((int16_t)buffer[2])<<8) | buffer[3];
+		const int16_t raw_z = (((int16_t)buffer[4])<<8) | buffer[5];
+
+		const float gain = 8192.f;
+		const float g_to_ms2 = 9.81f;
+
+		acc[0] = raw_x*g_to_ms2/gain;
+		acc[1] = raw_y*g_to_ms2/gain;
+		acc[2] = raw_z*g_to_ms2/gain;
+	}
+}
+
 protocol_readings_t readings = {0};
 
 /* USER CODE END 0 */
@@ -303,6 +390,7 @@ int main(void)
 	bmp280_init();
 	//hmc5883l_init();
 	qmc5883l_init();
+	mpu6050_init();
 
 	uint8_t buffer[1024];
 
@@ -321,6 +409,10 @@ int main(void)
     	//hmc5883l_read(readings.magnetometer);
     	qmc5883l_read(readings.magnetometer);
     	readings.valid.magnetometer = 1;
+
+    	mpu6050_read(readings.accelerometer, readings.gyroscope);
+    	readings.valid.accelerometer = 1;
+    	readings.valid.gyroscope = 1;
 
     	readings.rangefinder = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
     	readings.valid.rangefinder = 1;
