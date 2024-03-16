@@ -20,15 +20,18 @@ typedef struct {
     float rangefinder;
     float barometer;
     float gps[2];
-    struct {
-        uint8_t magnetometer : 1;
-        uint8_t accelerometer : 1;
-        uint8_t gyroscope : 1;
-        uint8_t rangefinder : 1;
-        uint8_t barometer : 1;
-        uint8_t gps : 1;
-        uint8_t unused : 2;
-    } valid;
+    union {
+        struct {
+            uint8_t magnetometer : 1;
+            uint8_t accelerometer : 1;
+            uint8_t gyroscope : 1;
+            uint8_t rangefinder : 1;
+            uint8_t barometer : 1;
+            uint8_t gps : 1;
+            uint8_t unused : 2;
+        } valid;
+        uint8_t valid_all;
+    };
 } protocol_readings_t;
 
 typedef struct {

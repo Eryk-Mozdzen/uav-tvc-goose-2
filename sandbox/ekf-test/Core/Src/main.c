@@ -30,7 +30,6 @@
 #include "protocol_data.h"
 
 #include "mpu6050_regs.h"
-//#include "hmc5883l_regs.h"
 #include "qmc5883l_regs.h"
 #include "bmp280_regs.h"
 #include "bmp280_compensate.h"
@@ -55,12 +54,22 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
+I2C_HandleTypeDef hi2c3;
+DMA_HandleTypeDef hdma_i2c1_rx;
+DMA_HandleTypeDef hdma_i2c1_tx;
+DMA_HandleTypeDef hdma_i2c2_rx;
+DMA_HandleTypeDef hdma_i2c2_tx;
+DMA_HandleTypeDef hdma_i2c3_rx;
+DMA_HandleTypeDef hdma_i2c3_tx;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim10;
 TIM_HandleTypeDef htim11;
 
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart6;
+DMA_HandleTypeDef hdma_usart2_tx;
+DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
 
@@ -69,11 +78,14 @@ UART_HandleTypeDef huart6;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_I2C2_Init(void);
+static void MX_I2C3_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART6_UART_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM10_Init(void);
 static void MX_TIM11_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -82,46 +94,16 @@ static void MX_TIM11_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-/*void i2c2_slave_recovery() {
-	// config I2C SDA and SCL pin as IO pins
-	// manualy toggle SCL line to generate clock pulses until 10 consecutive 1 on SDA occure
-
-	__HAL_RCC_GPIOB_CLK_ENABLE();
-
-	GPIO_InitTypeDef GPIO_InitStruct;
-	GPIO_InitStruct.Pin = GPIO_PIN_8;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_LOW;
-	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-	GPIO_InitStruct.Pin = GPIO_PIN_9;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
-
-	int ones = 0;
-	while(ones<=10) {
-		if(!HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_9)) {
-			ones = 0;
-		}
-
-		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_8);
-		HAL_Delay(10);
-
-		ones++;
-	}
-}*/
-
 void bmp280_write(uint8_t address, uint8_t value) {
-	HAL_I2C_Mem_Write(&hi2c2, BMP280_ADDR<<1, address, 1, &value, 1, 100);
+	HAL_I2C_Mem_Write(&hi2c3, BMP280_ADDR<<1, address, 1, &value, 1, 100);
 }
 
 void bmp280_init() {
 	bmp280_write(BMP280_REG_RESET,
 		BMP280_RESET_VALUE
 	);
+
+	HAL_Delay(100);
 
 	bmp280_write(BMP280_REG_CTRL_MEAS,
 		BMP280_CTRL_TEMP_OVERSAMPLING_2 |
@@ -137,7 +119,7 @@ void bmp280_init() {
 
 	uint8_t buffer[24] = {0};
 
-	HAL_I2C_Mem_Read(&hi2c2, BMP280_ADDR<<1, BMP280_REG_CALIB00, 1, buffer, sizeof(buffer), 100);
+	HAL_I2C_Mem_Read(&hi2c3, BMP280_ADDR<<1, BMP280_REG_CALIB00, 1, buffer, sizeof(buffer), 100);
 
 	dig_T1 = (((uint16_t)buffer[1])<<8) | buffer[0];
 	dig_T2 = (((int16_t)buffer[3])<<8) | buffer[2];
@@ -153,53 +135,15 @@ void bmp280_init() {
 	dig_P9 = (((int16_t)buffer[23])<<8) | buffer[22];
 }
 
-void bmp280_read(float *temperature, float *pressure) {
-	uint8_t buffer[6] = {0};
-
-	HAL_I2C_Mem_Read(&hi2c2, BMP280_ADDR<<1, BMP280_REG_PRESS_MSB, 1, buffer, sizeof(buffer), 100);
-
+void bmp280_read(volatile float *pressure, const uint8_t *buffer) {
 	const int32_t raw_temperature  = (((int32_t)buffer[3])<<12) | (((int32_t)buffer[4])<<4) | (((int32_t)buffer[5])>>4);
 	const int32_t raw_pressure     = (((int32_t)buffer[0])<<12) | (((int32_t)buffer[1])<<4) | (((int32_t)buffer[2])>>4);
 
-	*temperature = bmp280_compensate_T_int32(raw_temperature)/100.f;	// *C
-	*pressure    = bmp280_compensate_P_int64(raw_pressure)/256.f;		// Pa
+	float temp = bmp280_compensate_T_int32(raw_temperature)/100.f;	// *C
+	*pressure  = bmp280_compensate_P_int64(raw_pressure)/256.f;		// Pa
+
+	(void)temp;
 }
-
-/*void hmc5883l_write(uint8_t address, uint8_t value) {
-	HAL_I2C_Mem_Write(&hi2c2, HMC5883L_ADDR<<1, address, 1, &value, 1, 100);
-}
-
-void hmc5883l_init() {
-	hmc5883l_write(HMC5883L_REG_CONFIG_A,
-		HMC5883L_CONFIG_A_MEAS_NORMAL |
-		HMC5883L_CONFIG_A_RATE_75 |
-		HMC5883L_CONFIG_A_SAMPLES_8
-	);
-
-	hmc5883l_write(HMC5883L_REG_CONFIG_B,
-		HMC5883L_CONFIG_B_RANGE_1_3GA
-	);
-
-	hmc5883l_write(HMC5883L_REG_MODE,
-		HMC5883L_MODE_CONTINOUS
-	);
-}
-
-void hmc5883l_read(float *mag) {
-	uint8_t buffer[6] = {0};
-
-	HAL_I2C_Mem_Read(&hi2c2, HMC5883L_ADDR<<1, HMC5883L_REG_DATA_X_MSB, 1, buffer, sizeof(buffer), 100);
-
-	const int16_t raw_x = (((int16_t)buffer[0])<<8) | buffer[1];
-	const int16_t raw_y = (((int16_t)buffer[4])<<8) | buffer[5];
-	const int16_t raw_z = (((int16_t)buffer[2])<<8) | buffer[3];
-
-	const float gain = 1090.f;
-
-	mag[0] = raw_x/gain;
-	mag[1] = raw_y/gain;
-	mag[2] = raw_z/gain;
-}*/
 
 void qmc5883l_write(uint8_t address, uint8_t value) {
 	HAL_I2C_Mem_Write(&hi2c2, QMC5883L_ADDR<<1, address, 1, &value, 1, 100);
@@ -209,6 +153,8 @@ void qmc5883l_init() {
 	qmc5883l_write(QMC5883L_REG_CONTROL_2,
 		QMC5883L_CONFIG_2_SOFT_RST
 	);
+
+	HAL_Delay(100);
 
 	qmc5883l_write(QMC5883L_REG_CONTROL_1,
 		QMC5883L_CONFIG_1_MODE_CONTINOUS |
@@ -226,11 +172,7 @@ void qmc5883l_init() {
 	);
 }
 
-void qmc5883l_read(float *mag) {
-	uint8_t buffer[6] = {0};
-
-	HAL_I2C_Mem_Read(&hi2c2, QMC5883L_ADDR<<1, QMC5883L_REG_DATA_OUTPUT_X_LSB, 1, buffer, sizeof(buffer), 100);
-
+void qmc5883l_read(volatile float *mag, const uint8_t *buffer) {
 	const int16_t raw_x = (((int16_t)buffer[1])<<8) | buffer[0];
 	const int16_t raw_y = (((int16_t)buffer[3])<<8) | buffer[2];
 	const int16_t raw_z = (((int16_t)buffer[5])<<8) | buffer[4];
@@ -297,11 +239,7 @@ void mpu6050_init() {
 	mpu6050_write(MPU6050_REG_SMPLRT_DIV, 4);
 }
 
-void mpu6050_read(float *acc, float *gyr) {
-	uint8_t buffer[14] = {0};
-
-	HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDR<<1, MPU6050_REG_ACCEL_XOUT_H, 1, buffer, sizeof(buffer), 100);
-
+void mpu6050_read(volatile float *acc, volatile float *gyr, const uint8_t *buffer) {
 	{
 		const int16_t raw_x = (((int16_t)buffer[8])<<8) | buffer[9];
 		const int16_t raw_y = (((int16_t)buffer[10])<<8) | buffer[11];
@@ -329,7 +267,63 @@ void mpu6050_read(float *acc, float *gyr) {
 	}
 }
 
-protocol_readings_t readings = {0};
+uint8_t imu_buffer[14];
+uint8_t mag_buffer[6];
+uint8_t bar_buffer[6];
+uint8_t message_buffer[1024];
+
+volatile protocol_readings_t readings = {0};
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	if(GPIO_Pin==MPU6050_INT_Pin) {
+		// imu
+		HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR<<1, MPU6050_REG_ACCEL_XOUT_H, 1, imu_buffer, sizeof(imu_buffer));
+	} else if(GPIO_Pin==QMC5883L_INT_Pin) {
+		// mag
+		HAL_I2C_Mem_Read_DMA(&hi2c2, QMC5883L_ADDR<<1, QMC5883L_REG_DATA_OUTPUT_X_LSB, 1, mag_buffer, sizeof(mag_buffer));
+	}
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+	if(htim==&htim10) {
+		/*const protocol_message_t message = {
+			.id = PROTOCOL_ID_READINGS,
+			.payload = (void *)&readings,
+			.size = sizeof(readings)
+		};
+		const uint16_t size = protocol_encode(message_buffer, &message);
+		HAL_UART_Transmit_DMA(&huart2, message_buffer, size);*/
+		readings.valid_all = 0;
+
+		// bar
+		HAL_I2C_Mem_Read_DMA(&hi2c3, BMP280_ADDR<<1, BMP280_REG_PRESS_MSB, 1, bar_buffer, sizeof(bar_buffer));
+	}
+}
+
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+	if(hi2c==&hi2c1) {
+		// imu
+		mpu6050_read(readings.accelerometer, readings.gyroscope, imu_buffer);
+		readings.valid.accelerometer = 1;
+		readings.valid.gyroscope = 1;
+	} else if(hi2c==&hi2c2) {
+		// mag
+		qmc5883l_read(readings.magnetometer, mag_buffer);
+		readings.valid.magnetometer = 1;
+	} else if(hi2c==&hi2c3) {
+		// bar
+		bmp280_read(&readings.barometer, bar_buffer);
+		readings.valid.barometer = 1;
+	}
+}
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
+	if(htim==&htim2) {
+		// range
+		readings.rangefinder = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
+		readings.valid.rangefinder = 1;
+	}
+}
 
 /* USER CODE END 0 */
 
@@ -361,11 +355,14 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_I2C1_Init();
   MX_I2C2_Init();
+  MX_I2C3_Init();
   MX_USART2_UART_Init();
   MX_USART6_UART_Init();
   MX_TIM2_Init();
+  MX_TIM10_Init();
   MX_TIM11_Init();
   /* USER CODE BEGIN 2 */
 
@@ -374,67 +371,18 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-	HAL_TIM_PWM_Start(&htim11, TIM_CHANNEL_1);
-	__HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, 10);
-
-	HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_1);
-	HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_2);
-
-	/*for(uint8_t i=0; i<127; i++) {
-		uint8_t reg;
-		if(HAL_I2C_Mem_Read(&hi2c2, i<<1, 0, 1, &reg, 1, 100)==HAL_OK) {
-			reg++;
-		}
-	}*/
-
 	bmp280_init();
-	//hmc5883l_init();
 	qmc5883l_init();
 	mpu6050_init();
 
-	uint8_t buffer[1024];
+	HAL_TIM_Base_Start_IT(&htim10);
 
-	protocol_message_t message;
+	__HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, 10);
+	HAL_TIM_PWM_Start(&htim11, TIM_CHANNEL_1);
+	HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_1);
+	HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
 
     while(1) {
-		//uint8_t byte;
-		//HAL_UART_Receive(&huart6, &byte, 1, HAL_MAX_DELAY);
-
-    	//message.size = sprintf(message.payload, "witam: %lu", HAL_GetTick());
-
-    	float temperature;
-    	bmp280_read(&temperature, &readings.barometer);
-    	readings.valid.barometer = 1;
-
-    	//hmc5883l_read(readings.magnetometer);
-    	qmc5883l_read(readings.magnetometer);
-    	readings.valid.magnetometer = 1;
-
-    	mpu6050_read(readings.accelerometer, readings.gyroscope);
-    	readings.valid.accelerometer = 1;
-    	readings.valid.gyroscope = 1;
-
-    	readings.rangefinder = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
-    	readings.valid.rangefinder = 1;
-
-    	message.id = PROTOCOL_ID_READINGS;
-    	message.payload = &readings;
-    	message.size = sizeof(readings);
-	  	const uint16_t size = protocol_encode(buffer, &message);
-
-	  	/*char xd[256];
-    	for(uint16_t i=0; i<size; i++) {
-    		sprintf(xd + 3*i, "%02X ", buffer[i]);
-    	}
-    	sprintf(xd+3*size, "\n\r");
-    	HAL_UART_Transmit(&huart2, xd, strlen(xd), HAL_MAX_DELAY);*/
-
-		HAL_UART_Transmit(&huart2, buffer, size, HAL_MAX_DELAY);
-
-		HAL_Delay(20);
-
-		//const uint32_t time = HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
-		//distance = 0.00017015f*time;
 
     /* USER CODE END WHILE */
 
@@ -539,7 +487,7 @@ static void MX_I2C2_Init(void)
 
   /* USER CODE END I2C2_Init 1 */
   hi2c2.Instance = I2C2;
-  hi2c2.Init.ClockSpeed = 100000;
+  hi2c2.Init.ClockSpeed = 400000;
   hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
   hi2c2.Init.OwnAddress1 = 0;
   hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -554,6 +502,40 @@ static void MX_I2C2_Init(void)
   /* USER CODE BEGIN I2C2_Init 2 */
 
   /* USER CODE END I2C2_Init 2 */
+
+}
+
+/**
+  * @brief I2C3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C3_Init(void)
+{
+
+  /* USER CODE BEGIN I2C3_Init 0 */
+
+  /* USER CODE END I2C3_Init 0 */
+
+  /* USER CODE BEGIN I2C3_Init 1 */
+
+  /* USER CODE END I2C3_Init 1 */
+  hi2c3.Instance = I2C3;
+  hi2c3.Init.ClockSpeed = 400000;
+  hi2c3.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c3.Init.OwnAddress1 = 0;
+  hi2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c3.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c3.Init.OwnAddress2 = 0;
+  hi2c3.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c3.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C3_Init 2 */
+
+  /* USER CODE END I2C3_Init 2 */
 
 }
 
@@ -628,6 +610,37 @@ static void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief TIM10 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM10_Init(void)
+{
+
+  /* USER CODE BEGIN TIM10_Init 0 */
+
+  /* USER CODE END TIM10_Init 0 */
+
+  /* USER CODE BEGIN TIM10_Init 1 */
+
+  /* USER CODE END TIM10_Init 1 */
+  htim10.Instance = TIM10;
+  htim10.Init.Prescaler = 500-1;
+  htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim10.Init.Period = 10000-1;
+  htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM10_Init 2 */
+
+  /* USER CODE END TIM10_Init 2 */
 
 }
 
@@ -744,6 +757,43 @@ static void MX_USART6_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  /* DMA1_Stream1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+  /* DMA1_Stream3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+  /* DMA1_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+  /* DMA1_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream7_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -759,11 +809,18 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /*Configure GPIO pins : PC0 PC1 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+  /*Configure GPIO pins : MPU6050_INT_Pin QMC5883L_INT_Pin */
+  GPIO_InitStruct.Pin = MPU6050_INT_Pin|QMC5883L_INT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */

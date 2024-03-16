@@ -114,7 +114,7 @@ static uint16_t cobs_decode(uint8_t *buffer) {
     return (uint16_t)(w - buffer);
 }
 
-uint16_t protocol_encode(void *dest, protocol_message_t *message) {
+uint16_t protocol_encode(void *dest, const protocol_message_t *message) {
     uint8_t *d = (uint8_t *)dest;
 
     memcpy(&d[5], message->payload, message->size);

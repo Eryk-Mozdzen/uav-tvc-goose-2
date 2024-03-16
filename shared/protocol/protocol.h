@@ -20,7 +20,7 @@ typedef struct {
     uint8_t id;
 } protocol_message_t;
 
-uint16_t protocol_encode(void *dest, protocol_message_t *message);
+uint16_t protocol_encode(void *dest, const protocol_message_t *message);
 bool protocol_decode(protocol_decoder_t *decoder, const uint8_t byte, protocol_message_t *message);
 
 #ifdef __cplusplus

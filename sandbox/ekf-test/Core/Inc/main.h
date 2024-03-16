@@ -59,6 +59,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define MPU6050_INT_Pin GPIO_PIN_0
+#define MPU6050_INT_GPIO_Port GPIOC
+#define MPU6050_INT_EXTI_IRQn EXTI0_IRQn
+#define QMC5883L_INT_Pin GPIO_PIN_1
+#define QMC5883L_INT_GPIO_Port GPIOC
+#define QMC5883L_INT_EXTI_IRQn EXTI1_IRQn
 
 /* USER CODE BEGIN Private defines */
 
