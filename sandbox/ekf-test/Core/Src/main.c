@@ -273,8 +273,6 @@ uint8_t bar_buffer[6];
 volatile uint8_t imu_ready = 0;
 volatile uint8_t mag_ready = 0;
 volatile uint8_t bar_ready = 0;
-volatile uint8_t transmit_readings = 0;
-volatile uint8_t transmit_complete = 1;
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if(GPIO_Pin==MPU6050_INT_Pin) {
@@ -303,7 +301,6 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 	} else if(hi2c==&hi2c3) {
 		// bar
 		bar_ready = 1;
-		transmit_readings = 1;
 	}
 }
 
@@ -367,6 +364,8 @@ int main(void)
 	uint8_t message_buffer[1024];
 	protocol_readings_t readings = {0};
 
+	uint32_t last = 0;
+
     while(1) {
 
     	if(imu_ready) {
@@ -391,8 +390,8 @@ int main(void)
     	readings.rangefinder = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
 		readings.valid.rangefinder = 1;
 
-    	if(transmit_readings) {
-    		transmit_readings = 0;
+    	if((HAL_GetTick() - last)>50) {
+    		last = HAL_GetTick();
 
 			const protocol_message_t message = {
 				.id = PROTOCOL_ID_READINGS,
