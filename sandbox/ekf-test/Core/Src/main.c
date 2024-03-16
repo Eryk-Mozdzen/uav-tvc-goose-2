@@ -135,7 +135,7 @@ void bmp280_init() {
 	dig_P9 = (((int16_t)buffer[23])<<8) | buffer[22];
 }
 
-void bmp280_read(volatile float *pressure, const uint8_t *buffer) {
+void bmp280_read(float *pressure, const uint8_t *buffer) {
 	const int32_t raw_temperature  = (((int32_t)buffer[3])<<12) | (((int32_t)buffer[4])<<4) | (((int32_t)buffer[5])>>4);
 	const int32_t raw_pressure     = (((int32_t)buffer[0])<<12) | (((int32_t)buffer[1])<<4) | (((int32_t)buffer[2])>>4);
 
@@ -172,7 +172,7 @@ void qmc5883l_init() {
 	);
 }
 
-void qmc5883l_read(volatile float *mag, const uint8_t *buffer) {
+void qmc5883l_read(float *mag, const uint8_t *buffer) {
 	const int16_t raw_x = (((int16_t)buffer[1])<<8) | buffer[0];
 	const int16_t raw_y = (((int16_t)buffer[3])<<8) | buffer[2];
 	const int16_t raw_z = (((int16_t)buffer[5])<<8) | buffer[4];
@@ -239,7 +239,7 @@ void mpu6050_init() {
 	mpu6050_write(MPU6050_REG_SMPLRT_DIV, 4);
 }
 
-void mpu6050_read(volatile float *acc, volatile float *gyr, const uint8_t *buffer) {
+void mpu6050_read(float *acc, float *gyr, const uint8_t *buffer) {
 	{
 		const int16_t raw_x = (((int16_t)buffer[8])<<8) | buffer[9];
 		const int16_t raw_y = (((int16_t)buffer[10])<<8) | buffer[11];
@@ -270,9 +270,11 @@ void mpu6050_read(volatile float *acc, volatile float *gyr, const uint8_t *buffe
 uint8_t imu_buffer[14];
 uint8_t mag_buffer[6];
 uint8_t bar_buffer[6];
-uint8_t message_buffer[1024];
-
-volatile protocol_readings_t readings = {0};
+volatile uint8_t imu_ready = 0;
+volatile uint8_t mag_ready = 0;
+volatile uint8_t bar_ready = 0;
+volatile uint8_t transmit_readings = 0;
+volatile uint8_t transmit_complete = 1;
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if(GPIO_Pin==MPU6050_INT_Pin) {
@@ -286,15 +288,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if(htim==&htim10) {
-		/*const protocol_message_t message = {
-			.id = PROTOCOL_ID_READINGS,
-			.payload = (void *)&readings,
-			.size = sizeof(readings)
-		};
-		const uint16_t size = protocol_encode(message_buffer, &message);
-		HAL_UART_Transmit_DMA(&huart2, message_buffer, size);*/
-		readings.valid_all = 0;
-
 		// bar
 		HAL_I2C_Mem_Read_DMA(&hi2c3, BMP280_ADDR<<1, BMP280_REG_PRESS_MSB, 1, bar_buffer, sizeof(bar_buffer));
 	}
@@ -303,25 +296,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 	if(hi2c==&hi2c1) {
 		// imu
-		mpu6050_read(readings.accelerometer, readings.gyroscope, imu_buffer);
-		readings.valid.accelerometer = 1;
-		readings.valid.gyroscope = 1;
+		imu_ready = 1;
 	} else if(hi2c==&hi2c2) {
 		// mag
-		qmc5883l_read(readings.magnetometer, mag_buffer);
-		readings.valid.magnetometer = 1;
+		mag_ready = 1;
 	} else if(hi2c==&hi2c3) {
 		// bar
-		bmp280_read(&readings.barometer, bar_buffer);
-		readings.valid.barometer = 1;
-	}
-}
-
-void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
-	if(htim==&htim2) {
-		// range
-		readings.rangefinder = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
-		readings.valid.rangefinder = 1;
+		bar_ready = 1;
+		transmit_readings = 1;
 	}
 }
 
@@ -380,9 +362,50 @@ int main(void)
 	__HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, 10);
 	HAL_TIM_PWM_Start(&htim11, TIM_CHANNEL_1);
 	HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_1);
-	HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
+	HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_2);
+
+	uint8_t message_buffer[1024];
+	protocol_readings_t readings = {0};
 
     while(1) {
+
+    	if(imu_ready) {
+    		imu_ready = 0;
+			mpu6050_read(readings.accelerometer, readings.gyroscope, imu_buffer);
+			readings.valid.accelerometer = 1;
+			readings.valid.gyroscope = 1;
+    	}
+
+    	if(mag_ready) {
+    		mag_ready = 0;
+    		qmc5883l_read(readings.magnetometer, mag_buffer);
+    		readings.valid.magnetometer = 1;
+    	}
+
+    	if(bar_ready) {
+    		bar_ready = 0;
+    		bmp280_read(&readings.barometer, bar_buffer);
+    		readings.valid.barometer = 1;
+    	}
+
+    	readings.rangefinder = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
+		readings.valid.rangefinder = 1;
+
+    	if(transmit_readings) {
+    		transmit_readings = 0;
+
+			const protocol_message_t message = {
+				.id = PROTOCOL_ID_READINGS,
+				.payload = &readings,
+				.size = sizeof(readings)
+			};
+
+			const uint16_t size = protocol_encode(message_buffer, &message);
+
+			readings.valid_all = 0;
+
+			HAL_UART_Transmit_DMA(&huart2, message_buffer, size);
+    	}
 
     /* USER CODE END WHILE */
 

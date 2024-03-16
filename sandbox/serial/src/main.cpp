@@ -9,7 +9,7 @@
 #include "protocol_data.h"
 
 std::ostream & operator<<(std::ostream &stream, const protocol_readings_t readings) {
-	stream << "bar";
+	stream << "press";
 	stream << std::setprecision(0) << std::fixed << std::noshowpos << std::setw(7);
 	stream << (readings.valid.barometer ? readings.barometer : std::nan(""));
 
