@@ -72,17 +72,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	uint8_t buffer[1024];
-	uint8_t payload[1024];
 
 	protocol_decoder_t decoder {
 		buffer,
 		sizeof(buffer),
-		0
-	};
-
-	protocol_message_t message {
-		payload,
-		0,
 		0
 	};
 
@@ -92,6 +85,7 @@ int main(int argc, char *argv[]) {
 		const QByteArray data = serial.readAll();
 
 		for(const uint8_t byte : data) {
+			protocol_message_t message;
 			if(!protocol_decode(&decoder, byte, &message)) {
 				continue;
 			}

@@ -166,8 +166,7 @@ bool protocol_decode(protocol_decoder_t *decoder, const uint8_t byte, protocol_m
 	}
 
     message->id = decoder->buffer[2];
-
-	memcpy(message->payload, decoder->buffer + 5, message->size);
+    message->payload = &decoder->buffer[5];
 
     decoder->counter = 0;
 
