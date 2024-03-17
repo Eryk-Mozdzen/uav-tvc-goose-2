@@ -10,6 +10,3 @@
 [submodule "third-party/eigen"]
 	path = third-party/eigen
 	url = https://gitlab.com/libeigen/eigen.git
-[submodule "third-party/CMSIS-DSP"]
-	path = third-party/CMSIS-DSP
-	url = git@github.com:ARM-software/CMSIS-DSP.git
