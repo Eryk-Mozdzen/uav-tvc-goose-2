@@ -1,9 +1,9 @@
 #include <iostream>
 #include <iomanip>
-#include <string>
-#include <cmath>
-#include <fcntl.h>
-#include <unistd.h>
+
+#include <QCoreApplication>
+#include <QSerialPort>
+#include <QTimer>
 
 #include "protocol.h"
 #include "protocol_data.h"
@@ -59,15 +59,18 @@ std::ostream & operator<<(std::ostream &stream, const protocol_estimation_t esti
 	return stream;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+	QCoreApplication app(argc, argv);
 
-	int port = open("/dev/ttyACM0", O_RDONLY);
-	if(port<0) {
+	QSerialPort serial;
+	serial.setPortName("/dev/ttyACM0");
+	serial.setBaudRate(115200);
+
+	if(!serial.open(QIODevice::OpenModeFlag::ReadWrite)) {
 		std::cerr << "can't open port" << std::endl;
 		return 1;
 	}
 
-	uint8_t serial[256];
 	uint8_t buffer[1024];
 	uint8_t payload[1024];
 
@@ -83,30 +86,37 @@ int main() {
 		0
 	};
 
-	while(true) {
-		const int n = read(port, serial, sizeof(serial));
+	QTimer timer;
 
-		for(int i=0; i<n; i++) {
-			if(protocol_decode(&decoder, serial[i], &message)) {
-				switch(message.id) {
-					case PROTOCOL_ID_LOG: {
-						std::cout << std::string(reinterpret_cast<char *>(message.payload), message.size) << std::endl;
-					} break;
-					case PROTOCOL_ID_READINGS: {
-						protocol_readings_t *readings = reinterpret_cast<protocol_readings_t *>(message.payload);
-						std::cout << *readings << std::endl;
-					} break;
-					case PROTOCOL_ID_ESTIMATION: {
-						protocol_estimation_t *estimation = reinterpret_cast<protocol_estimation_t *>(message.payload);
-						std::cout << *estimation << std::endl;
-					} break;
-					default: {
-						std::cout << "unknown id" << std::endl;
-					} break;
-				}
+	QObject::connect(&timer, &QTimer::timeout, [&]() {
+		const QByteArray data = serial.readAll();
+
+		for(const uint8_t byte : data) {
+			if(!protocol_decode(&decoder, byte, &message)) {
+				continue;
+			}
+
+			switch(message.id) {
+				case PROTOCOL_ID_LOG: {
+					const char *str = reinterpret_cast<char *>(message.payload);
+					std::cout << std::string(str, message.size) << std::endl;
+				} break;
+				case PROTOCOL_ID_READINGS: {
+					const protocol_readings_t *readings = reinterpret_cast<protocol_readings_t *>(message.payload);
+					std::cout << *readings << std::endl;
+				} break;
+				case PROTOCOL_ID_ESTIMATION: {
+					const protocol_estimation_t *estimation = reinterpret_cast<protocol_estimation_t *>(message.payload);
+					std::cout << *estimation << std::endl;
+				} break;
+				default: {
+					std::cout << "unknown message" << std::endl;
+				} break;
 			}
 		}
-	}
+	});
 
-	close(port);
+	timer.start(10);
+
+	return app.exec();
 }
