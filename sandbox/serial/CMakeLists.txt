@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
+set(CMAKE_AUTOMOC ON)
+
 project(serial)
 
 find_package(Qt6 REQUIRED COMPONENTS
@@ -10,10 +12,11 @@ find_package(Qt6 REQUIRED COMPONENTS
 add_executable(${PROJECT_NAME}
 	"src/main.cpp"
 	"../../shared/protocol/protocol.c"
+	"../../shared/communication/Serial.cpp"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
-	"../../shared/protocol"
+	"../../shared"
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE
