@@ -11,6 +11,7 @@
 #include "qmc5883l_regs.h"
 #include "bmp280_regs.h"
 #include "bmp280_compensate.h"
+#include "ekf.h"
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
@@ -449,6 +450,95 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 	}
 }
 
+EKF_PREDICT(7, 3)
+EKF_CORRECT(7, 3)
+
+void rotation_f(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {
+
+}
+
+void rotation_df(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {
+
+}
+
+void accelerometer_h(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {
+
+}
+
+void accelerometer_dh(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {
+
+}
+
+void magnetometer_h(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {
+
+}
+
+void magnetometer_dh(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {
+
+}
+
+float x_data[7] = {1, 0, 0, 0, 0, 0, 0};
+float P_data[7*7] = {
+    1, 0, 0, 0, 0, 0, 0,
+    0, 1, 0, 0, 0, 0, 0,
+    0, 0, 1, 0, 0, 0, 0,
+    0, 0, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 0, 0, 1, 0,
+    0, 0, 0, 0, 0, 0, 1
+};
+ekf_t ekf = {
+    .x.numRows = 7,
+    .x.numCols = 1,
+    .x.pData = x_data,
+    .P.numRows = 7,
+    .P.numCols = 7,
+    .P.pData = P_data
+};
+
+float Q_data[7*7] = {
+    1, 0, 0, 0, 0, 0, 0,
+    0, 1, 0, 0, 0, 0, 0,
+    0, 0, 1, 0, 0, 0, 0,
+    0, 0, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 0, 0, 1, 0,
+    0, 0, 0, 0, 0, 0, 1
+};
+ekf_system_model_t rotation_model = {
+    .Q.numRows = 7,
+    .Q.numCols = 7,
+    .Q.pData = Q_data,
+    .f = rotation_f,
+    .df = rotation_df
+};
+
+float acc_R_data[3*3] = {
+    1, 0, 0,
+    0, 1, 0,
+    0, 0, 1
+};
+ekf_measurement_model_t accelerometer_model = {
+    .R.numRows = 3,
+    .R.numCols = 3,
+    .R.pData = acc_R_data,
+    .h = accelerometer_h,
+    .dh = accelerometer_dh
+};
+
+float mag_R_data[3*3] = {
+    1, 0, 0,
+    0, 1, 0,
+    0, 0, 1
+};
+ekf_measurement_model_t magnetometer_model = {
+    .R.numRows = 3,
+    .R.numCols = 3,
+    .R.pData = mag_R_data,
+    .h = magnetometer_h,
+    .dh = magnetometer_dh
+};
+
 int main() {
 
     HAL_Init();
@@ -478,6 +568,7 @@ int main() {
 
     uint8_t message_buffer[1024];
     protocol_readings_t readings = {0};
+    protocol_estimation_t estimations = {0};
 
     uint32_t last = 0;
 
@@ -487,12 +578,17 @@ int main() {
             mpu6050_read(readings.accelerometer, readings.gyroscope, imu_buffer);
             readings.valid.accelerometer = 1;
             readings.valid.gyroscope = 1;
+
+            ekf_correct_7_3(&ekf, &accelerometer_model, readings.accelerometer);
+            ekf_predict_7_3(&ekf, &rotation_model, readings.gyroscope);
         }
 
         if(mag_ready) {
             mag_ready = 0;
             qmc5883l_read(readings.magnetometer, mag_buffer);
             readings.valid.magnetometer = 1;
+
+            ekf_correct_7_3(&ekf, &magnetometer_model, readings.magnetometer);
         }
 
         if(bar_ready) {
@@ -512,7 +608,15 @@ int main() {
                 .payload = &readings,
                 .size = sizeof(readings)
             };
+            /*
+            memcpy(estimations.orientation, &ekf.x.pData[0], 4*sizeof(float));
 
+            const protocol_message_t message = {
+                .id = PROTOCOL_ID_ESTIMATION,
+                .payload = &estimations,
+                .size = sizeof(estimations)
+            };
+            */
             const uint16_t size = protocol_encode(message_buffer, &message);
 
             readings.valid_all = 0;

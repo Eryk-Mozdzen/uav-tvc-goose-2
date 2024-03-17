@@ -47,6 +47,18 @@ std::ostream & operator<<(std::ostream &stream, const protocol_readings_t readin
 	return stream;
 }
 
+std::ostream & operator<<(std::ostream &stream, const protocol_estimation_t estimation) {
+	stream << "qua [";
+	stream << std::setprecision(2) << std::fixed << std::showpos;
+	stream << std::setw(6) << estimation.orientation[0];
+	stream << std::setw(6) << estimation.orientation[1];
+	stream << std::setw(6) << estimation.orientation[2];
+	stream << std::setw(6) << estimation.orientation[3];
+	stream << "]";
+
+	return stream;
+}
+
 int main() {
 
 	int port = open("/dev/ttyACM0", O_RDONLY);
@@ -83,6 +95,10 @@ int main() {
 					case PROTOCOL_ID_READINGS: {
 						protocol_readings_t *readings = reinterpret_cast<protocol_readings_t *>(message.payload);
 						std::cout << *readings << std::endl;
+					} break;
+					case PROTOCOL_ID_ESTIMATION: {
+						protocol_estimation_t *estimation = reinterpret_cast<protocol_estimation_t *>(message.payload);
+						std::cout << *estimation << std::endl;
 					} break;
 					default: {
 						std::cout << "unknown id" << std::endl;
