@@ -1,6 +1,4 @@
-
 #include "stm32f4xx_hal.h"
-#include "stm32f4xx_it.h"
 
 extern DMA_HandleTypeDef hdma_i2c1_rx;
 extern DMA_HandleTypeDef hdma_i2c1_tx;
@@ -8,10 +6,13 @@ extern DMA_HandleTypeDef hdma_i2c2_rx;
 extern DMA_HandleTypeDef hdma_i2c2_tx;
 extern DMA_HandleTypeDef hdma_i2c3_rx;
 extern DMA_HandleTypeDef hdma_i2c3_tx;
-extern TIM_HandleTypeDef htim10;
-extern DMA_HandleTypeDef hdma_usart2_tx;
 extern DMA_HandleTypeDef hdma_usart2_rx;
+extern DMA_HandleTypeDef hdma_usart2_tx;
+extern DMA_HandleTypeDef hdma_usart6_rx;
+extern DMA_HandleTypeDef hdma_usart6_tx;
 extern UART_HandleTypeDef huart2;
+extern UART_HandleTypeDef huart6;
+extern TIM_HandleTypeDef htim10;
 
 void NMI_Handler() {
     while(1) {
@@ -95,14 +96,26 @@ void DMA1_Stream6_IRQHandler() {
     HAL_DMA_IRQHandler(&hdma_usart2_tx);
 }
 
-void TIM1_UP_TIM10_IRQHandler() {
-    HAL_TIM_IRQHandler(&htim10);
+void DMA1_Stream7_IRQHandler() {
+    HAL_DMA_IRQHandler(&hdma_i2c2_tx);
+}
+
+void DMA2_Stream1_IRQHandler() {
+    HAL_DMA_IRQHandler(&hdma_usart6_rx);
+}
+
+void DMA2_Stream6_IRQHandler() {
+    HAL_DMA_IRQHandler(&hdma_usart6_tx);
 }
 
 void USART2_IRQHandler() {
     HAL_UART_IRQHandler(&huart2);
 }
 
-void DMA1_Stream7_IRQHandler() {
-    HAL_DMA_IRQHandler(&hdma_i2c2_tx);
+void USART6_IRQHandler() {
+    HAL_UART_IRQHandler(&huart6);
+}
+
+void TIM1_UP_TIM10_IRQHandler() {
+    HAL_TIM_IRQHandler(&htim10);
 }

@@ -37,9 +37,9 @@ std::ostream & operator<<(std::ostream &stream, const protocol_readings_t readin
 	stream << "]";
 
 	stream << "   gps [";
-	stream << std::setprecision(2) << std::fixed << std::noshowpos;
-	stream << std::setw(6) << (readings.valid.gps ? readings.gps[0] : std::nan(""));
-	stream << std::setw(6) << (readings.valid.gps ? readings.gps[1] : std::nan(""));
+	stream << std::setprecision(6) << std::fixed << std::noshowpos;
+	stream << std::setw(10) << (readings.valid.gps ? readings.gps[0] : std::nan(""));
+	stream << std::setw(10) << (readings.valid.gps ? readings.gps[1] : std::nan(""));
 	stream << "]";
 
 	return stream;

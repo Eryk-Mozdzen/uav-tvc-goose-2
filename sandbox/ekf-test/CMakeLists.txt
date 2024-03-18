@@ -40,6 +40,7 @@ add_executable(${TARGET}
 	"HAL/stm32f4xx_hal_msp.c"
 
 	"src/main.c"
+	"src/nmea.c"
 	"src/bmp280_compensate.c"
 )
 

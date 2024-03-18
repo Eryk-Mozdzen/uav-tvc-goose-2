@@ -12,6 +12,7 @@
 #include "bmp280_regs.h"
 #include "bmp280_compensate.h"
 #include "ekf.h"
+#include "nmea.h"
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
@@ -29,12 +30,14 @@ TIM_HandleTypeDef htim11;
 
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart6;
-DMA_HandleTypeDef hdma_usart2_tx;
 DMA_HandleTypeDef hdma_usart2_rx;
+DMA_HandleTypeDef hdma_usart2_tx;
+DMA_HandleTypeDef hdma_usart6_rx;
+DMA_HandleTypeDef hdma_usart6_tx;
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
-void SystemClock_Config() {
+static void SystemClock_Config() {
     __HAL_RCC_PWR_CLK_ENABLE();
     __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
@@ -195,6 +198,7 @@ static void MX_USART6_UART_Init() {
 
 static void MX_DMA_Init() {
     __HAL_RCC_DMA1_CLK_ENABLE();
+    __HAL_RCC_DMA2_CLK_ENABLE();
 
     HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
@@ -219,6 +223,12 @@ static void MX_DMA_Init() {
 
     HAL_NVIC_SetPriority(DMA1_Stream7_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(DMA1_Stream7_IRQn);
+
+    HAL_NVIC_SetPriority(DMA2_Stream1_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(DMA2_Stream1_IRQn);
+
+    HAL_NVIC_SetPriority(DMA2_Stream6_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
 }
 
 static void MX_GPIO_Init() {
@@ -302,19 +312,19 @@ void qmc5883l_init() {
 
 	HAL_Delay(100);
 
-	qmc5883l_write(QMC5883L_REG_CONTROL_1,
-		QMC5883L_CONFIG_1_MODE_CONTINOUS |
-		QMC5883L_CONFIG_1_ODR_200HZ |
-		QMC5883L_CONFIG_1_OSR_512 |
-		QMC5883L_CONFIG_1_RNG_2G
+    qmc5883l_write(QMC5883L_REG_SET_RESET,
+		QMC5883L_SET_RESET_RECOMMENDED
 	);
 
-	qmc5883l_write(QMC5883L_REG_CONTROL_2,
+    qmc5883l_write(QMC5883L_REG_CONTROL_2,
 		QMC5883L_CONFIG_2_INT_ENB_ENABLE
 	);
 
-	qmc5883l_write(QMC5883L_REG_SET_RESET,
-		QMC5883L_SET_RESET_RECOMMENDED
+	qmc5883l_write(QMC5883L_REG_CONTROL_1,
+        QMC5883L_CONFIG_1_OSR_512 |
+        QMC5883L_CONFIG_1_RNG_8G |
+		QMC5883L_CONFIG_1_ODR_200HZ |
+        QMC5883L_CONFIG_1_MODE_CONTINOUS
 	);
 }
 
@@ -323,7 +333,7 @@ void qmc5883l_read(float *mag, const uint8_t *buffer) {
 	const int16_t raw_y = (((int16_t)buffer[3])<<8) | buffer[2];
 	const int16_t raw_z = (((int16_t)buffer[5])<<8) | buffer[4];
 
-	const float gain = 2.f/(1<<15);
+	const float gain = 8.f/((float)(1<<16));
 
 	mag[0] = raw_x*gain;
 	mag[1] = raw_y*gain;
@@ -416,9 +426,11 @@ void mpu6050_read(float *acc, float *gyr, const uint8_t *buffer) {
 uint8_t imu_buffer[14];
 uint8_t mag_buffer[6];
 uint8_t bar_buffer[6];
+uint8_t gps_buffer[32];
 volatile uint8_t imu_ready = 0;
 volatile uint8_t mag_ready = 0;
 volatile uint8_t bar_ready = 0;
+volatile uint8_t gps_ready = 0;
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if(GPIO_Pin==GPIO_PIN_0) {
@@ -448,6 +460,18 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 		// bar
 		bar_ready = 1;
 	}
+}
+
+void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
+    if(huart==&huart6) {
+        gps_ready = 1;
+    }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if(huart==&huart6) {
+        gps_ready = 2;
+    }
 }
 
 EKF_PREDICT(7, 3)
@@ -566,13 +590,19 @@ int main() {
     HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_1);
     HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_2);
 
+    HAL_UART_Receive_DMA(&huart6, gps_buffer, sizeof(gps_buffer));
+
     uint8_t message_buffer[1024];
     protocol_readings_t readings = {0};
-    protocol_estimation_t estimations = {0};
+    //protocol_estimation_t estimations = {0};
+    NMEA_Message_t nmea_message;
 
     uint32_t last = 0;
 
     while(1) {
+        readings.rangefinder = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
+        readings.valid.rangefinder = 1;
+
         if(imu_ready) {
             imu_ready = 0;
             mpu6050_read(readings.accelerometer, readings.gyroscope, imu_buffer);
@@ -597,10 +627,42 @@ int main() {
             readings.valid.barometer = 1;
         }
 
-        readings.rangefinder = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
-        readings.valid.rangefinder = 1;
+        if(gps_ready) {
+            const uint8_t size = sizeof(gps_buffer)/2;
+            const uint8_t *src = (gps_ready==1) ? gps_buffer : &gps_buffer[size];
+            gps_ready = 0;
 
-        if((HAL_GetTick() - last)>50) {
+            for(size_t s=0; s<size; s++) {
+				const char c = src[s];
+
+				if(NMEA_Consume(&nmea_message, c)) {
+					if(nmea_message.argv[2][0]=='A') {
+						float latitude = 0;
+						float longitude = 0;
+
+						{
+							const float minutes = atof(&nmea_message.argv[3][2]);
+							nmea_message.argv[3][2] = '\0';
+							const int degree = atoi(nmea_message.argv[3]);
+							latitude = degree + minutes/60.f;
+						}
+
+						{
+							const float minutes = atof(&nmea_message.argv[5][3]);
+							nmea_message.argv[5][3] = '\0';
+							const int degree = atoi(nmea_message.argv[5]);
+							longitude = degree + minutes/60.f;
+						}
+
+						readings.gps[0] = latitude;
+                        readings.gps[1] = longitude;
+                        readings.valid.gps = 1;
+					}
+				}
+			}
+        }
+
+        if((HAL_GetTick() - last)>100) {
             last = HAL_GetTick();
 
             const protocol_message_t message = {
