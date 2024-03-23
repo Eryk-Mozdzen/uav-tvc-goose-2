@@ -91,7 +91,7 @@ Window::Window(QWidget *parent) : QWidget{parent}, current{nullptr} {
         calibration_text->setReadOnly(true);
         QPushButton *button_read = new QPushButton("read from device", group);
         QPushButton *button_update = new QPushButton("update parameters", group);
-        QPushButton *button_set = new QPushButton("write to device", group);
+        QPushButton *button_set = new QPushButton("write into device", group);
 
         connect(button_read, &QPushButton::clicked, [&]() {
             calibration_text->setText("waiting for data...");

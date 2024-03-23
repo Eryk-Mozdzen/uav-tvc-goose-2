@@ -25,8 +25,9 @@ void Viewer::paintEvent(QPaintEvent *event) {
 	const float window_scale = 0.4f*size/max;
 
 	QPainter painter(this);
-	painter.fillRect(rect(), Qt::black);
+	painter.fillRect(rect(), Qt::transparent);
 	painter.translate(rect().center());
+	painter.setPen(QPen(Qt::transparent));
 
 	for(const Sample &sample : samples) {
 		const Sample conv = params*sample;
@@ -37,7 +38,7 @@ void Viewer::paintEvent(QPaintEvent *event) {
 
 		painter.setBrush(Qt::red);
 		painter.drawEllipse(x, y, point, point);
-		painter.setBrush(Qt::green);
+		painter.setBrush(Qt::darkGreen);
 		painter.drawEllipse(y, z, point, point);
 		painter.setBrush(Qt::blue);
 		painter.drawEllipse(z, x, point, point);
