@@ -42,6 +42,7 @@ add_executable(${TARGET}
 	"src/main.c"
 	"src/nmea.c"
 	"src/bmp280_compensate.c"
+	"src/estimator.c"
 )
 
 target_compile_definitions(${TARGET} PRIVATE

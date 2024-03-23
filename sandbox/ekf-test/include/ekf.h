@@ -20,6 +20,12 @@ typedef struct {
 	void (*dh)(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z);
 } ekf_measurement_model_t;
 
+#define EKF_PREDICT_DEF(X, U) \
+    void ekf_predict_##X##_##U(ekf_t *ekf, const ekf_system_model_t *system, const float *u_data);
+
+#define EKF_CORRECT_DEF(X, Z) \
+    void ekf_correct_##X##_##Z(ekf_t *ekf, const ekf_measurement_model_t *measurement, const float *z_data);
+
 #define EKF_PREDICT(X, U) \
     void ekf_predict_##X##_##U(ekf_t *ekf, const ekf_system_model_t *system, const float *u_data) { \
         arm_matrix_instance_f32 u = { \
