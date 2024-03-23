@@ -15,29 +15,29 @@ void i2c_recovery(GPIO_TypeDef *sda_port, uint16_t sda_pin, GPIO_TypeDef *scl_po
 	// config I2C SDA and SCL pin as IO pins
 	// manualy toggle SCL line to generate clock pulses until 10 consecutive 1 on SDA occure
 
-	GPIO_InitTypeDef GPIO_InitStruct;
-	GPIO_InitStruct.Pin = sda_pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_LOW;
-	HAL_GPIO_Init(sda_port, &GPIO_InitStruct);
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
 	GPIO_InitStruct.Pin = scl_pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
 	HAL_GPIO_Init(scl_port, &GPIO_InitStruct);
 
-	HAL_GPIO_WritePin(sda_port, sda_pin, GPIO_PIN_RESET);
+	GPIO_InitStruct.Pin = sda_pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	HAL_GPIO_Init(sda_port, &GPIO_InitStruct);
+
+	HAL_GPIO_WritePin(scl_port, scl_pin, GPIO_PIN_RESET);
 
 	int ones = 0;
-	while(ones<=10) {
-		if(!HAL_GPIO_ReadPin(scl_port, scl_pin)) {
-			ones = 0;
-		}
+    int max = 100;
+	while(ones<=10 && max--) {
+		if(HAL_GPIO_ReadPin(sda_port, sda_pin)) {
+			ones++;
+		} else {
+            ones = 0;
+        }
 
-		HAL_GPIO_TogglePin(sda_port, sda_pin);
+		HAL_GPIO_TogglePin(scl_port, scl_pin);
 		HAL_Delay(10);
-
-		ones++;
 	}
 }
 
