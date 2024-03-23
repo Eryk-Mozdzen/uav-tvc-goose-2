@@ -10,7 +10,9 @@ extern "C" {
 typedef enum {
     PROTOCOL_ID_LOG,
     PROTOCOL_ID_READINGS,
-    PROTOCOL_ID_ESTIMATION
+    PROTOCOL_ID_ESTIMATION,
+    PROTOCOL_ID_CALIBRATION,
+    PROTOCOL_ID_CONTROL
 } protocol_id_t;
 
 typedef struct {
@@ -41,6 +43,11 @@ typedef struct {
     float angular_velocity[3];
     float pressure_0;
 } protocol_estimation_t;
+
+typedef struct {
+    float magnetometer[12];
+    float accelerometer[6];
+} protocol_calibration_t;
 
 #ifdef __cplusplus
 }
