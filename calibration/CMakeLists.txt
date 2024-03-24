@@ -18,6 +18,8 @@ add_executable(${PROJECT_NAME}
 	"src/Window.cpp"
 	"src/magnetometer/Magnetometer.cpp"
 	"src/magnetometer/Viewer.cpp"
+	"src/accelerometer/Accelerometer.cpp"
+	"src/accelerometer/Axis.cpp"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
