@@ -11,6 +11,7 @@
 #include "Window.h"
 #include "Magnetometer.h"
 #include "Accelerometer.h"
+#include "Gyroscope.h"
 
 std::ostream & operator<<(std::ostream &stream, const protocol_calibration_t &calibration) {
     stream << std::setprecision(3) << std::fixed << std::showpos;
@@ -46,6 +47,7 @@ std::ostream & operator<<(std::ostream &stream, const protocol_calibration_t &ca
 Window::Window(QWidget *parent) : QWidget{parent}, current{nullptr} {
     interfaces.push_back(new Magnetometer());
     interfaces.push_back(new Accelerometer());
+    interfaces.push_back(new Gyroscope());
 
     QGridLayout *grid = new QGridLayout(this);
 
@@ -132,9 +134,13 @@ Window::Window(QWidget *parent) : QWidget{parent}, current{nullptr} {
 void Window::setCurrent(Interface *interface) {
     if(current) {
         interface_layout->removeWidget(current);
+        delete current;
+        current = nullptr;
     }
 
-    current = interface;
+    if(interface) {
+        current = interface->create();
+    }
 
     if(current) {
         interface_layout->addWidget(current);

@@ -16,9 +16,7 @@ public:
         return name;
     }
 
-    virtual void receive(const protocol_readings_t &readings) {
-        (void)readings;
-    };
-
+    virtual Interface * create() const = 0;
+    virtual void receive(const protocol_readings_t &readings) = 0;
     virtual void update(protocol_calibration_t &calibration) const = 0;
 };

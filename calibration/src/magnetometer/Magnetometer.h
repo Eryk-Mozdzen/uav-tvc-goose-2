@@ -20,6 +20,7 @@ class Magnetometer : public Interface {
 public:
     Magnetometer(QWidget *parent = nullptr);
 
+    Interface * create() const;
     void receive(const protocol_readings_t &readings);
     void update(protocol_calibration_t &calibration) const;
 };

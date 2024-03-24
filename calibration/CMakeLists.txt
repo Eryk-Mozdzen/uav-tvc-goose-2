@@ -20,6 +20,7 @@ add_executable(${PROJECT_NAME}
 	"src/magnetometer/Viewer.cpp"
 	"src/accelerometer/Accelerometer.cpp"
 	"src/accelerometer/Axis.cpp"
+	"src/gyroscope/Gyroscope.cpp"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -27,6 +28,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 	"src"
 	"src/magnetometer"
 	"src/accelerometer"
+	"src/gyroscope"
 	"src/servos"
 )
 

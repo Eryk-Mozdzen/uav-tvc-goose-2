@@ -17,6 +17,10 @@ Magnetometer::Magnetometer(QWidget *parent) : Interface("magnetometer", parent),
     layout->addWidget(&calibrated);
 }
 
+Interface * Magnetometer::create() const {
+    return new Magnetometer();
+}
+
 Eigen::VectorXd bestFitEllipsoid(const std::vector<Sample> &samples) {
     Eigen::MatrixXd x(samples.size(), 1);
     Eigen::MatrixXd y(samples.size(), 1);

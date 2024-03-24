@@ -9,6 +9,10 @@ Accelerometer::Accelerometer(QWidget *parent) : Interface{"accelerometer", paren
     layout->addWidget(&axisZ);
 }
 
+Interface * Accelerometer::create() const {
+    return new Accelerometer();
+}
+
 void Accelerometer::receive(const protocol_readings_t &readings) {
     if(readings.valid.accelerometer) {
         axisX.set(readings.accelerometer[0]);
