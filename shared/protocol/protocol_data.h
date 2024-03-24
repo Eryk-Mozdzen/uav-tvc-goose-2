@@ -46,8 +46,15 @@ typedef struct {
 
 typedef struct {
     float magnetometer[12];
-    float accelerometer[6];
+    float accelerometer[12];
+    float gyroscope[3];
+    uint16_t servos[12];
 } protocol_calibration_t;
+
+typedef struct {
+    uint16_t servos[4];
+    uint16_t motor;
+} protocol_control_t;
 
 #ifdef __cplusplus
 }

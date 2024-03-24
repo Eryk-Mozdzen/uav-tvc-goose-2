@@ -7,48 +7,42 @@
 #include <QVBoxLayout>
 #include <QPushButton>
 #include <QTextEdit>
-#include <Eigen/Dense>
 
 #include "Window.h"
 #include "Magnetometer.h"
 
 std::ostream & operator<<(std::ostream &stream, const protocol_calibration_t &calibration) {
-    const Eigen::Matrix3d mag_A {
-        {calibration.magnetometer[0], calibration.magnetometer[1], calibration.magnetometer[2]},
-        {calibration.magnetometer[3], calibration.magnetometer[4], calibration.magnetometer[5]},
-        {calibration.magnetometer[6], calibration.magnetometer[7], calibration.magnetometer[8]}
-    };
+    stream << std::setprecision(3) << std::fixed << std::showpos;
 
-    const Eigen::Vector3d mag_b {
-        calibration.magnetometer[9],
-        calibration.magnetometer[10],
-        calibration.magnetometer[11]
-    };
+    stream << "magnetometer\n";
+    stream << std::setw(8) << calibration.magnetometer[0] << std::setw(8) << calibration.magnetometer[1] << std::setw(8) << calibration.magnetometer[2] << std::setw(12) << calibration.magnetometer[9]  << "\n";
+    stream << std::setw(8) << calibration.magnetometer[3] << std::setw(8) << calibration.magnetometer[4] << std::setw(8) << calibration.magnetometer[5] << std::setw(12) << calibration.magnetometer[10] << "\n";
+    stream << std::setw(8) << calibration.magnetometer[6] << std::setw(8) << calibration.magnetometer[7] << std::setw(8) << calibration.magnetometer[8] << std::setw(12) << calibration.magnetometer[11] << "\n";
+    stream << "\n";
 
-    const Eigen::Matrix3d accel_A = Eigen::DiagonalMatrix<double, 3, 3>({
-        calibration.accelerometer[0],
-        calibration.accelerometer[1],
-        calibration.accelerometer[2]
-    });
+    stream << "accelerometer\n";
+    stream << std::setw(8) << calibration.accelerometer[0] << std::setw(8) << calibration.accelerometer[1] << std::setw(8) << calibration.accelerometer[2] << std::setw(12) << calibration.accelerometer[9]  << "\n";
+    stream << std::setw(8) << calibration.accelerometer[3] << std::setw(8) << calibration.accelerometer[4] << std::setw(8) << calibration.accelerometer[5] << std::setw(12) << calibration.accelerometer[10] << "\n";
+    stream << std::setw(8) << calibration.accelerometer[6] << std::setw(8) << calibration.accelerometer[7] << std::setw(8) << calibration.accelerometer[8] << std::setw(12) << calibration.accelerometer[11] << "\n";
+    stream << "\n";
 
-    const Eigen::Vector3d accel_b {
-        calibration.accelerometer[3],
-        calibration.accelerometer[4],
-        calibration.accelerometer[5]
-    };
+    stream << "gyroscope\n";
+    stream << std::setw(8) << calibration.gyroscope[0] << "\n";
+    stream << std::setw(8) << calibration.gyroscope[1] << "\n";
+    stream << std::setw(8) << calibration.gyroscope[2] << "\n";
+    stream << "\n";
 
-    stream << std::setprecision(4) << std::fixed << std::showpos;
-    stream << "magnetometer scale:\n" << mag_A << "\n";
-    stream << "magnetometer offset:\n" << mag_b << "\n";
-    stream << "accelerometer scale:\n" << accel_A << "\n";
-    stream << "accelerometer offset:\n" << accel_b << "\n";
+    stream << "servos\n";
+    stream << std::noshowpos;
+    stream << std::setw(8) << calibration.servos[0] << std::setw(8) << calibration.servos[1]  << std::setw(8) << calibration.servos[2]  << "\n";
+    stream << std::setw(8) << calibration.servos[3] << std::setw(8) << calibration.servos[4]  << std::setw(8) << calibration.servos[5]  << "\n";
+    stream << std::setw(8) << calibration.servos[6] << std::setw(8) << calibration.servos[7]  << std::setw(8) << calibration.servos[8]  << "\n";
+    stream << std::setw(8) << calibration.servos[9] << std::setw(8) << calibration.servos[10] << std::setw(8) << calibration.servos[11] << "\n";
 
     return stream;
 }
 
 Window::Window(QWidget *parent) : QWidget{parent}, current{nullptr} {
-    memset(&calibration, 0, sizeof(calibration));
-
     interfaces.push_back(new Magnetometer());
 
     QGridLayout *grid = new QGridLayout(this);
@@ -85,10 +79,14 @@ Window::Window(QWidget *parent) : QWidget{parent}, current{nullptr} {
         QGroupBox *group = new QGroupBox("parameters");
         QVBoxLayout *layout  = new QVBoxLayout(group);
 
-        group->setFixedWidth(250);
+        group->setFixedWidth(350);
+
+        QFont font("System", 10);
+        font.setStyleHint(QFont::TypeWriter);
 
         calibration_text = new QTextEdit(group);
         calibration_text->setReadOnly(true);
+        calibration_text->setFont(font);
         QPushButton *button_read = new QPushButton("read from device", group);
         QPushButton *button_update = new QPushButton("update parameters", group);
         QPushButton *button_set = new QPushButton("write into device", group);

@@ -13,7 +13,12 @@
 class Window : public QWidget {
     Q_OBJECT
 
-    protocol_calibration_t calibration;
+    protocol_calibration_t calibration = {
+        {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0},
+        {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0},
+        {0, 0, 0},
+        {500, 1500, 2500, 500, 1500, 2500, 500, 1500, 2500, 500, 1500, 2500}
+    };
     std::vector<Interface *> interfaces;
     Interface *current;
     QTextEdit *calibration_text;
