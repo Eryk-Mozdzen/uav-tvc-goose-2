@@ -12,6 +12,7 @@
 #include "Magnetometer.h"
 #include "Accelerometer.h"
 #include "Gyroscope.h"
+#include "Servos.h"
 
 std::ostream & operator<<(std::ostream &stream, const protocol_calibration_t &calibration) {
     stream << std::setprecision(3) << std::fixed << std::showpos;
@@ -48,6 +49,7 @@ Window::Window(QWidget *parent) : QWidget{parent}, current{nullptr} {
     interfaces.push_back(new Magnetometer());
     interfaces.push_back(new Accelerometer());
     interfaces.push_back(new Gyroscope());
+    interfaces.push_back(new Servos(this));
 
     QGridLayout *grid = new QGridLayout(this);
 

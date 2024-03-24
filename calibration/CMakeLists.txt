@@ -21,6 +21,7 @@ add_executable(${PROJECT_NAME}
 	"src/accelerometer/Accelerometer.cpp"
 	"src/accelerometer/Axis.cpp"
 	"src/gyroscope/Gyroscope.cpp"
+	"src/servos/Servos.cpp"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
