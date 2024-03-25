@@ -22,6 +22,7 @@ signals:
 
 public:
 	Serial(const char *port="/dev/ttyACM0", QObject *parent = nullptr);
+	~Serial();
 };
 
 }

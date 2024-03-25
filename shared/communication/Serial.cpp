@@ -13,11 +13,13 @@ Serial::Serial(const char *port, QObject *parent) : QObject{parent} {
     decoder.counter = 0;
 
     serial.setPortName(port);
-    serial.setBaudRate(115200);
+    serial.setBaudRate(QSerialPort::Baud115200);
 
-    if(!serial.open(QIODevice::OpenModeFlag::ReadWrite)) {
+    if(!serial.open(QIODevice::ReadWrite)) {
         throw std::runtime_error("can't open port");
 	}
+
+    serial.clear(QSerialPort::AllDirections);
 
     connect(&serial, &QSerialPort::readyRead, [&]() {
         const QByteArray data = serial.readAll();
@@ -30,6 +32,13 @@ Serial::Serial(const char *port, QObject *parent) : QObject{parent} {
 			}
 		}
     });
+}
+
+Serial::~Serial() {
+    if(serial.isOpen()) {
+        serial.clear(QSerialPort::AllDirections);
+        serial.close();
+    }
 }
 
 void Serial::transmit(const protocol_message_t &message) {

@@ -22,11 +22,15 @@ ekf_t ekf = {
 };
 
 static void rotation_f(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {
-
+    (void)x;
+    (void)u;
+    (void)x_next;
 }
 
 static void rotation_df(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {
-
+    (void)x;
+    (void)u;
+    (void)x_next;
 }
 
 static float Q_data[7*7] = {
@@ -48,11 +52,13 @@ ekf_system_model_t rotation_model = {
 };
 
 static void accelerometer_h(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {
-
+    (void)x;
+    (void)z;
 }
 
 static void accelerometer_dh(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {
-
+    (void)x;
+    (void)z;
 }
 
 static float acc_R_data[3*3] = {
@@ -70,11 +76,13 @@ ekf_measurement_model_t accelerometer_model = {
 };
 
 static void magnetometer_h(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {
-
+    (void)x;
+    (void)z;
 }
 
 static void magnetometer_dh(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {
-
+    (void)x;
+    (void)z;
 }
 
 static float mag_R_data[3*3] = {

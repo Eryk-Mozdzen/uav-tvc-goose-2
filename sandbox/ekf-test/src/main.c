@@ -14,6 +14,8 @@
 #include "ekf.h"
 #include "nmea.h"
 #include "estimator.h"
+#include "nvm.h"
+#include "communication.h"
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
@@ -464,14 +466,30 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 }
 
 void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
-    if(huart==&huart6) {
+    if(huart==&huart2) {
+        communication_event(COMMUNICATION_EVENT_RX_HALF);
+    } else if(huart==&huart6) {
         gps_ready = 1;
     }
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    if(huart==&huart6) {
+    if(huart==&huart2) {
+        communication_event(COMMUNICATION_EVENT_RX_CPLT);
+    } else if(huart==&huart6) {
         gps_ready = 2;
+    }
+}
+
+void HAL_UART_TxHalfCpltCallback(UART_HandleTypeDef *huart) {
+    if(huart==&huart2) {
+        communication_event(COMMUNICATION_EVENT_TX_HALF);
+    }
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+    if(huart==&huart2) {
+        communication_event(COMMUNICATION_EVENT_TX_CPLT);
     }
 }
 
@@ -504,9 +522,14 @@ int main() {
 
     HAL_UART_Receive_DMA(&huart6, gps_buffer, sizeof(gps_buffer));
 
-    uint8_t message_buffer[1024];
+    communication_init();
+
+    uint8_t recv_buffer[1024];
+    protocol_decoder_t recv_decoder = {
+        .buffer = recv_buffer,
+        .size = sizeof(recv_buffer)
+    };
     protocol_readings_t readings = {0};
-    //protocol_estimation_t estimations = {0};
     NMEA_Message_t nmea_message;
 
     uint32_t last = 0;
@@ -574,6 +597,31 @@ int main() {
 			}
         }
 
+        uint8_t byte;
+        while(communication_receive(&byte)) {
+            protocol_message_t msg;
+            if(protocol_decode(&recv_decoder, byte, &msg)) {
+                switch(msg.id) {
+                    case PROTOCOL_ID_CALIBRATION: {
+                        if(msg.size==0) {
+                            protocol_calibration_t calibration;
+                            nvm_read(0, &calibration, sizeof(calibration));
+                            const protocol_message_t message = {
+                                .id = PROTOCOL_ID_CALIBRATION,
+                                .payload = &calibration,
+                                .size = sizeof(calibration)
+                            };
+                            uint8_t buffer[1024];
+                            const uint16_t size = protocol_encode(buffer, &message);
+                            communication_transmit(buffer, size);
+                        } else if(msg.size==sizeof(protocol_calibration_t)) {
+                            nvm_write(0, msg.payload, msg.size);
+                        }
+                    } break;
+                }
+            }
+        }
+
         if((HAL_GetTick() - last)>100) {
             last = HAL_GetTick();
 
@@ -582,20 +630,11 @@ int main() {
                 .payload = &readings,
                 .size = sizeof(readings)
             };
-            /*
-            memcpy(estimations.orientation, &ekf.x.pData[0], 4*sizeof(float));
-
-            const protocol_message_t message = {
-                .id = PROTOCOL_ID_ESTIMATION,
-                .payload = &estimations,
-                .size = sizeof(estimations)
-            };
-            */
-            const uint16_t size = protocol_encode(message_buffer, &message);
+            uint8_t buffer[1024];
+            const uint16_t size = protocol_encode(buffer, &message);
+            communication_transmit(buffer, size);
 
             readings.valid_all = 0;
-
-            HAL_UART_Transmit_DMA(&huart2, message_buffer, size);
         }
     }
 }

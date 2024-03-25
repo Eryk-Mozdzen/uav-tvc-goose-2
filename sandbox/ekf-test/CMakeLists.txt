@@ -43,6 +43,8 @@ add_executable(${TARGET}
 	"src/nmea.c"
 	"src/bmp280_compensate.c"
 	"src/estimator.c"
+	"src/nvm.c"
+	"src/communication.c"
 )
 
 target_compile_definitions(${TARGET} PRIVATE
@@ -78,6 +80,7 @@ target_compile_options(${TARGET} PRIVATE
 		-std=c17
 
 		-Wall
+		-Wpedantic
 		-Wdouble-promotion
 
 		-ffunction-sections
