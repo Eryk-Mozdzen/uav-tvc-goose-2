@@ -509,6 +509,8 @@ int main() {
     MX_TIM10_Init();
     MX_TIM11_Init();
 
+    communication_init();
+
     bmp280_init();
     qmc5883l_init();
     mpu6050_init();
@@ -521,8 +523,6 @@ int main() {
     HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_2);
 
     HAL_UART_Receive_DMA(&huart6, gps_buffer, sizeof(gps_buffer));
-
-    communication_init();
 
     uint8_t recv_buffer[1024];
     protocol_decoder_t recv_decoder = {
@@ -603,20 +603,24 @@ int main() {
             if(protocol_decode(&recv_decoder, byte, &msg)) {
                 switch(msg.id) {
                     case PROTOCOL_ID_CALIBRATION: {
+                        protocol_calibration_t calibration;
+
                         if(msg.size==0) {
-                            protocol_calibration_t calibration;
                             nvm_read(0, &calibration, sizeof(calibration));
-                            const protocol_message_t message = {
-                                .id = PROTOCOL_ID_CALIBRATION,
-                                .payload = &calibration,
-                                .size = sizeof(calibration)
-                            };
-                            uint8_t buffer[1024];
-                            const uint16_t size = protocol_encode(buffer, &message);
-                            communication_transmit(buffer, size);
-                        } else if(msg.size==sizeof(protocol_calibration_t)) {
+                        } else if(msg.size==sizeof(calibration)) {
                             nvm_write(0, msg.payload, msg.size);
+                            memcpy(&calibration, msg.payload, msg.size);
                         }
+
+                        const protocol_message_t message = {
+                            .id = PROTOCOL_ID_CALIBRATION,
+                            .payload = &calibration,
+                            .size = sizeof(calibration)
+                        };
+
+                        uint8_t buffer[1024];
+                        const uint16_t size = protocol_encode(buffer, &message);
+                        communication_transmit(buffer, size);
                     } break;
                 }
             }
@@ -630,6 +634,7 @@ int main() {
                 .payload = &readings,
                 .size = sizeof(readings)
             };
+
             uint8_t buffer[1024];
             const uint16_t size = protocol_encode(buffer, &message);
             communication_transmit(buffer, size);

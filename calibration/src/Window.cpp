@@ -98,7 +98,7 @@ Window::Window(QWidget *parent) : QWidget{parent}, current{nullptr} {
         QPushButton *button_set = new QPushButton("write into device", group);
 
         connect(button_read, &QPushButton::clicked, [&]() {
-            calibration_text->setText("waiting for data...");
+            calibration_text->setText("fetching...");
             const protocol_message_t calibration_request = {nullptr, 0, PROTOCOL_ID_CALIBRATION};
             transmit(calibration_request);
         });
@@ -116,6 +116,7 @@ Window::Window(QWidget *parent) : QWidget{parent}, current{nullptr} {
         });
 
         connect(button_set, &QPushButton::clicked, [&]() {
+            calibration_text->setText("saving...");
             const protocol_message_t calibration_frame = {
                 &calibration,
                 sizeof(calibration),
