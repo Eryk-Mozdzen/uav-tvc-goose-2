@@ -8,8 +8,8 @@
 namespace shared {
 
 Serial::Serial(const char *port, QObject *parent) : QObject{parent} {
-    decoder.buffer = rx_buffer;
-    decoder.size = sizeof(rx_buffer);
+    decoder.buffer = decoder_buffer;
+    decoder.size = sizeof(decoder_buffer);
     decoder.counter = 0;
 
     serial.setPortName(port);
@@ -18,8 +18,6 @@ Serial::Serial(const char *port, QObject *parent) : QObject{parent} {
     if(!serial.open(QIODevice::ReadWrite)) {
         throw std::runtime_error("can't open port");
 	}
-
-    serial.clear(QSerialPort::AllDirections);
 
     connect(&serial, &QSerialPort::readyRead, [&]() {
         const QByteArray data = serial.readAll();
@@ -36,16 +34,16 @@ Serial::Serial(const char *port, QObject *parent) : QObject{parent} {
 
 Serial::~Serial() {
     if(serial.isOpen()) {
-        serial.clear(QSerialPort::AllDirections);
         serial.close();
     }
 }
 
 void Serial::transmit(const protocol_message_t &message) {
-    const uint16_t size = protocol_encode(tx_buffer, &message);
+    uint8_t buffer[1024];
+    const uint16_t size = protocol_encode(buffer, &message);
 
-	serial.write(reinterpret_cast<char *>(tx_buffer), size);
-    serial.waitForBytesWritten(100);
+	serial.write(reinterpret_cast<char *>(buffer), size);
+    serial.waitForBytesWritten();
 }
 
 }

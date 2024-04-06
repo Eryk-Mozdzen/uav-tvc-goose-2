@@ -9,8 +9,7 @@ namespace shared {
 class Serial : public QObject {
     Q_OBJECT
 
-	uint8_t rx_buffer[1024];
-	uint8_t tx_buffer[1024];
+	uint8_t decoder_buffer[1024];
 	protocol_decoder_t decoder;
 	QSerialPort serial;
 

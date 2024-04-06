@@ -246,6 +246,10 @@ static void MX_GPIO_Init() {
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
     HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
@@ -468,6 +472,7 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
     if(huart==&huart2) {
         communication_event(COMMUNICATION_EVENT_RX_HALF);
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     } else if(huart==&huart6) {
         gps_ready = 1;
     }
@@ -603,14 +608,12 @@ int main() {
             if(protocol_decode(&recv_decoder, byte, &msg)) {
                 switch(msg.id) {
                     case PROTOCOL_ID_CALIBRATION: {
-                        protocol_calibration_t calibration;
-
-                        if(msg.size==0) {
-                            nvm_read(0, &calibration, sizeof(calibration));
-                        } else if(msg.size==sizeof(calibration)) {
+                        if(msg.size==sizeof(protocol_calibration_t)) {
                             nvm_write(0, msg.payload, msg.size);
-                            memcpy(&calibration, msg.payload, msg.size);
                         }
+
+                        protocol_calibration_t calibration;
+                        nvm_read(0, &calibration, sizeof(calibration));
 
                         const protocol_message_t message = {
                             .id = PROTOCOL_ID_CALIBRATION,

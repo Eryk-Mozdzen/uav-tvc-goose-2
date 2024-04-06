@@ -5,7 +5,7 @@
 
 #include "communication.h"
 
-#define PACKET 8
+#define PACKET 16
 
 extern UART_HandleTypeDef huart2;
 
@@ -92,7 +92,6 @@ void communication_event(const communication_event_t event) {
                 output[i + PACKET] = 0;
                 i++;
             }
-            HAL_UART_Transmit_DMA(&huart2, output, 2*PACKET);
         } break;
     }
 }
