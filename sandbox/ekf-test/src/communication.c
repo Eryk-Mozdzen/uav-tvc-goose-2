@@ -93,5 +93,8 @@ void communication_event(const communication_event_t event) {
                 i++;
             }
         } break;
+        case COMMUNICATION_EVENT_ERROR: {
+            HAL_UART_Receive_DMA(&huart2, input, 2*PACKET);
+        } break;
     }
 }

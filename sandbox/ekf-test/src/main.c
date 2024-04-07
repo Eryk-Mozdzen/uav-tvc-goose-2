@@ -498,6 +498,12 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
     }
 }
 
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+    if(huart==&huart2) {
+        communication_event(COMMUNICATION_EVENT_ERROR);
+    }
+}
+
 int main() {
 
     HAL_Init();
