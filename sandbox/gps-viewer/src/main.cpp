@@ -1,6 +1,4 @@
 #include <QApplication>
-#include <QDebug>
-#include <QTime>
 
 #include "Map.h"
 #include "protocol/protocol_data.h"
@@ -9,10 +7,11 @@
 int main(int argc, char *argv[]) {
 	QApplication app(argc, argv);
 
-	shared::Serial serial;
-
-	Map map(51.103525733902586, 17.085345490751223);
+	Map map;
+	map.setView(51.1035, 17.0853);
 	map.show();
+
+	shared::Serial serial;
 
     QObject::connect(&serial, &shared::Serial::receive, [&](const protocol_message_t &message) {
 		if(message.id!=PROTOCOL_ID_READINGS) {
@@ -21,12 +20,9 @@ int main(int argc, char *argv[]) {
 
 		const protocol_readings_t *readings = reinterpret_cast<protocol_readings_t *>(message.payload);
 
-		if(!readings->valid.gps) {
-			qDebug() << QTime::currentTime().toString() << "GPS data not valid";
-			return;
+		if(readings->valid.gps) {
+			map.append(readings->gps[0], readings->gps[1], "red");
 		}
-
-        map.mark(readings->gps[0], readings->gps[1]);
     });
 
 	return app.exec();

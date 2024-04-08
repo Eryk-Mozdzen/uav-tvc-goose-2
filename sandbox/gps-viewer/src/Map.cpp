@@ -1,46 +1,52 @@
-#include <QHBoxLayout>
-
 #include "Map.h"
 
-Map::Map(double latitude, double longitude, int zoom, QWidget *parent) :
-        QWidget{parent},
-        init_latitude{latitude},
-        init_longitude{longitude},
-        init_zoom{zoom},
-        loaded{false} {
+int Map::path_id_counter = 0;
 
-    QHBoxLayout *layout = new QHBoxLayout(this);
-    layout->addWidget(&view);
-    layout->setContentsMargins(0, 0, 0, 0);
+Map::Map(QWidget *parent) : QWebEngineView{parent} {
+    timer.setInterval(20);
 
-    connect(view.page(), &QWebEnginePage::loadFinished, this, [&]() {
-        loaded = true;
-        set(init_latitude, init_longitude, init_zoom);
+    connect(&timer, &QTimer::timeout, [&]() {
+        while(queue.size()>0) {
+            page()->runJavaScript(queue.front());
+            queue.dequeue();
+        }
     });
 
-    view.page()->load(QUrl(QStringLiteral("qrc:///res/index.html")));
+    connect(this, &Map::loadFinished, [&]() {
+        timer.start();
+    });
+
+    load(QUrl(QStringLiteral("qrc:///res/index.html")));
 }
 
-void Map::mark(double latitude, double longitude) {
-    if(!loaded) {
-        return;
-    }
-
-    const QString lat = QString::number(latitude, 'f', 20);
-    const QString lng = QString::number(longitude, 'f', 20);
-    const QString script = QString("addMarker(%1, %2);").arg(lat).arg(lng);
-
-    view.page()->runJavaScript(script);
-}
-
-void Map::set(double latitude, double longitude, int zoom) {
-    if(!loaded) {
-        return;
-    }
-
+void Map::setView(double latitude, double longitude, int zoom) {
     const QString lat = QString::number(latitude, 'f', 20);
     const QString lng = QString::number(longitude, 'f', 20);
     const QString script = QString("setView(%1, %2, %3);").arg(lat).arg(lng).arg(zoom);
 
-    view.page()->runJavaScript(script);
+    queue.enqueue(script);
+}
+
+int Map::createPath(QString color) {
+    const QString script = QString("createPolyLine('%1')").arg(color);
+
+    queue.enqueue(script);
+
+    return path_id_counter++;
+}
+
+void Map::append(double latitude, double longitude, int path_id) {
+    const QString lat = QString::number(latitude, 'f', 20);
+    const QString lng = QString::number(longitude, 'f', 20);
+    const QString script = QString("appendPolyLine(%1, %2, %3)").arg(lat).arg(lng).arg(path_id);
+
+    queue.enqueue(script);
+}
+
+void Map::append(double latitude, double longitude, QString color) {
+    const QString lat = QString::number(latitude, 'f', 20);
+    const QString lng = QString::number(longitude, 'f', 20);
+    const QString script = QString("addPoint(%1, %2, '%3')").arg(lat).arg(lng).arg(color);
+
+    queue.enqueue(script);
 }

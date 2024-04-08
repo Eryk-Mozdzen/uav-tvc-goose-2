@@ -1,19 +1,19 @@
 #pragma once
 
-#include <QWidget>
 #include <QWebEngineView>
+#include <QQueue>
+#include <QTimer>
 
-class Map : public QWidget {
-    const double init_latitude;
-    const double init_longitude;
-    const int init_zoom;
-
-    QWebEngineView view;
-    bool loaded;
+class Map : public QWebEngineView {
+    static int path_id_counter;
+    QQueue<QString> queue;
+    QTimer timer;
 
 public:
-    explicit Map(double latitude, double longitude, int zoom = 19, QWidget *parent = nullptr);
+    Map(QWidget *parent = nullptr);
 
-    void mark(double latitude, double longitude);
-    void set(double latitude, double longitude, int zoom);
+    void setView(double latitude, double longitude, int zoom = 19);
+    int createPath(QString color);
+    void append(double latitude, double longitude, QString color);
+    void append(double latitude, double longitude, int path_id);
 };

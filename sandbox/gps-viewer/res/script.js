@@ -1,22 +1,28 @@
 
 var map
-var markers = []
-
-function addMarker(lat, lng) {
-    let marker = L.marker([lat, lng])
-
-    marker.addTo(map)
-
-    markers.push(marker)
-
-    if(markers.length>100) {
-        let oldestMarker = markers.shift()
-        map.removeLayer(oldestMarker)
-    }
-}
+var polylines = []
 
 function setView(lat, lng, zoom) {
     map.setView([lat, lng], zoom)
+}
+
+function createPolyLine(color) {
+    let polyline = L.polyline([], {
+        color: color
+    }).addTo(map);
+
+    polylines.push(polyline)
+}
+
+function appendPolyLine(lat, lng, index) {
+    polylines[index].addLatLng([lat, lng])
+}
+
+function addPoint(lat, lng, color) {
+    let point = L.circleMarker([lat, lng], {
+        color: color,
+        radius: 1
+    }).addTo(map)
 }
 
 window.addEventListener('DOMContentLoaded', function() {
