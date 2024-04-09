@@ -7,7 +7,7 @@
 #define NMEA_MAX_FIELD_NUM     24
 #define NMEA_MAX_FIELD_SIZE    16
 
-struct NMEA_Context {
+struct nmea_context {
     char tail[4];
     uint8_t state;
     uint8_t checksum;
@@ -18,9 +18,9 @@ struct NMEA_Context {
 typedef struct {
     uint8_t argc;
     char argv[NMEA_MAX_FIELD_NUM][NMEA_MAX_FIELD_SIZE];
-    struct NMEA_Context context;
-} NMEA_Message_t;
+    struct nmea_context context;
+} nmea_messaage_t;
 
-bool NMEA_Consume(NMEA_Message_t *message, const char byte);
+bool nmea_consume(nmea_messaage_t *message, const char byte);
 
 #endif

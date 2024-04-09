@@ -60,9 +60,19 @@ std::ostream & operator<<(std::ostream &stream, const protocol_estimation_t esti
 int main(int argc, char *argv[]) {
 	QCoreApplication app(argc, argv);
 
+	int filter = 0x00;
+	for(int i=1; i<argc; i++) {
+		const int id = QString::fromUtf8(argv[i]).toInt();
+		filter |=(1<<id);
+	}
+
 	shared::Serial serial;
 
-	QObject::connect(&serial, &shared::Serial::receive, [](const protocol_message_t &message) {
+	QObject::connect(&serial, &shared::Serial::receive, [&](const protocol_message_t &message) {
+		if(!(filter & (1<<message.id))) {
+			return;
+		}
+
 		switch(message.id) {
 			case PROTOCOL_ID_LOG: {
 				const char *str = reinterpret_cast<char *>(message.payload);
@@ -71,6 +81,10 @@ int main(int argc, char *argv[]) {
 			case PROTOCOL_ID_READINGS: {
 				const protocol_readings_t *readings = reinterpret_cast<protocol_readings_t *>(message.payload);
 				std::cout << *readings << std::endl;
+			} break;
+			case PROTOCOL_ID_PASSTHROUGH_GPS: {
+				const char *str = reinterpret_cast<char *>(message.payload);
+				std::cout << std::string(str, message.size);
 			} break;
 			case PROTOCOL_ID_ESTIMATION: {
 				const protocol_estimation_t *estimation = reinterpret_cast<protocol_estimation_t *>(message.payload);

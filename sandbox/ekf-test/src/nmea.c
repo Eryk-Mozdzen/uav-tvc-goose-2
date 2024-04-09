@@ -1,3 +1,5 @@
+#include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include "nmea.h"
@@ -8,14 +10,13 @@
 #define CR                  '\r'
 #define LF                  '\n'
 
-enum State {
+enum state {
     STATE_START,
     STATE_FIELDS,
     STATE_TAIL,
 };
 
-bool NMEA_Consume(NMEA_Message_t *message, const char byte) {
-
+bool nmea_consume(nmea_messaage_t *message, const char byte) {
     if(byte==START) {
         memset(message, 0, sizeof(*message));
         message->context.state = STATE_FIELDS;

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "stm32f4xx_hal.h"
 
@@ -433,7 +434,7 @@ void mpu6050_read(float *acc, float *gyr, const uint8_t *buffer) {
 uint8_t imu_buffer[14];
 uint8_t mag_buffer[6];
 uint8_t bar_buffer[6];
-uint8_t gps_buffer[32];
+uint8_t gps_buffer[16];
 volatile uint8_t imu_ready = 0;
 volatile uint8_t mag_ready = 0;
 volatile uint8_t bar_ready = 0;
@@ -504,6 +505,36 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
     }
 }
 
+void transmit(const uint8_t id, const void *data, const uint16_t len) {
+    const protocol_message_t message = {
+        .id = id,
+        .payload = (void *)data,
+        .size = len
+    };
+
+    uint8_t buffer[1024];
+    const uint16_t size = protocol_encode(buffer, &message);
+    communication_transmit(buffer, size);
+}
+
+void logger(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+
+	char str[128];
+    const uint16_t len = vsprintf(str, format, args);
+
+	const protocol_message_t message = {
+        .id = PROTOCOL_ID_LOG,
+        .payload = str,
+        .size = len
+    };
+
+    uint8_t buffer[128];
+    const uint16_t size = protocol_encode(buffer, &message);
+    communication_transmit(buffer, size);
+}
+
 int main() {
 
     HAL_Init();
@@ -521,6 +552,8 @@ int main() {
     MX_TIM11_Init();
 
     communication_init();
+
+    logger("system reset");
 
     bmp280_init();
     qmc5883l_init();
@@ -541,7 +574,7 @@ int main() {
         .size = sizeof(recv_buffer)
     };
     protocol_readings_t readings = {0};
-    NMEA_Message_t nmea_message;
+    nmea_messaage_t nmea_message = {0};
 
     uint32_t last = 0;
 
@@ -578,10 +611,12 @@ int main() {
             const uint8_t *src = (gps_ready==1) ? gps_buffer : &gps_buffer[size];
             gps_ready = 0;
 
+            transmit(PROTOCOL_ID_PASSTHROUGH_GPS, src, size);
+
             for(size_t s=0; s<size; s++) {
 				const char c = src[s];
 
-				if(NMEA_Consume(&nmea_message, c)) {
+				if(nmea_consume(&nmea_message, c)) {
 					if(nmea_message.argv[2][0]=='A') {
 						float latitude = 0;
 						float longitude = 0;
@@ -621,15 +656,7 @@ int main() {
                         protocol_calibration_t calibration;
                         nvm_read(0, &calibration, sizeof(calibration));
 
-                        const protocol_message_t message = {
-                            .id = PROTOCOL_ID_CALIBRATION,
-                            .payload = &calibration,
-                            .size = sizeof(calibration)
-                        };
-
-                        uint8_t buffer[1024];
-                        const uint16_t size = protocol_encode(buffer, &message);
-                        communication_transmit(buffer, size);
+                        transmit(PROTOCOL_ID_CALIBRATION, &calibration, sizeof(calibration));
                     } break;
                 }
             }
@@ -638,15 +665,7 @@ int main() {
         if((HAL_GetTick() - last)>100) {
             last = HAL_GetTick();
 
-            const protocol_message_t message = {
-                .id = PROTOCOL_ID_READINGS,
-                .payload = &readings,
-                .size = sizeof(readings)
-            };
-
-            uint8_t buffer[1024];
-            const uint16_t size = protocol_encode(buffer, &message);
-            communication_transmit(buffer, size);
+            transmit(PROTOCOL_ID_READINGS, &readings, sizeof(readings));
 
             readings.valid_all = 0;
         }
