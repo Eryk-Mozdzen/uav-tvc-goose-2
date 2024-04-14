@@ -6,6 +6,7 @@ project(serial)
 
 find_package(Qt6 REQUIRED COMPONENTS
 	Core
+	Network
 	SerialPort
 )
 
@@ -13,6 +14,7 @@ add_executable(${PROJECT_NAME}
 	"src/main.cpp"
 	"../../shared/protocol/protocol.c"
 	"../../shared/communication/Serial.cpp"
+	"../../shared/communication/Telnet.cpp"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -27,5 +29,6 @@ target_compile_options(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
 	Qt6::Core
+	Qt6::Network
 	Qt6::SerialPort
 )

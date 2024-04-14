@@ -1,5 +1,3 @@
-#include <stdexcept>
-
 #include <QSerialPort>
 
 #include "Serial.h"
@@ -27,9 +25,7 @@ Serial::Serial(const char *port, QObject *parent) : QObject{parent} {
 		}
     });
 
-    if(!serial.open(QIODevice::ReadWrite)) {
-        throw std::runtime_error("can't open port");
-	}
+    serial.open(QIODevice::ReadWrite);
 }
 
 Serial::~Serial() {
@@ -44,6 +40,7 @@ void Serial::transmit(const protocol_message_t &message) {
         const uint16_t size = protocol_encode(buffer, &message);
 
         serial.write(reinterpret_cast<char *>(buffer), size);
+        serial.flush();
         serial.waitForBytesWritten();
 	}
 }

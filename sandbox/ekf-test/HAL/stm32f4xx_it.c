@@ -6,10 +6,13 @@ extern DMA_HandleTypeDef hdma_i2c2_rx;
 extern DMA_HandleTypeDef hdma_i2c2_tx;
 extern DMA_HandleTypeDef hdma_i2c3_rx;
 extern DMA_HandleTypeDef hdma_i2c3_tx;
+extern DMA_HandleTypeDef hdma_usart1_rx;
+extern DMA_HandleTypeDef hdma_usart1_tx;
 extern DMA_HandleTypeDef hdma_usart2_rx;
 extern DMA_HandleTypeDef hdma_usart2_tx;
 extern DMA_HandleTypeDef hdma_usart6_rx;
 extern DMA_HandleTypeDef hdma_usart6_tx;
+extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart6;
 extern TIM_HandleTypeDef htim10;
@@ -104,8 +107,20 @@ void DMA2_Stream1_IRQHandler() {
     HAL_DMA_IRQHandler(&hdma_usart6_rx);
 }
 
+void DMA2_Stream2_IRQHandler() {
+    HAL_DMA_IRQHandler(&hdma_usart1_rx);
+}
+
 void DMA2_Stream6_IRQHandler() {
     HAL_DMA_IRQHandler(&hdma_usart6_tx);
+}
+
+void DMA2_Stream7_IRQHandler() {
+    HAL_DMA_IRQHandler(&hdma_usart1_tx);
+}
+
+void USART1_IRQHandler() {
+    HAL_UART_IRQHandler(&huart1);
 }
 
 void USART2_IRQHandler() {

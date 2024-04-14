@@ -44,7 +44,7 @@ add_executable(${TARGET}
 	"src/bmp280_compensate.c"
 	"src/estimator.c"
 	"src/nvm.c"
-	"src/communication.c"
+	"src/comm.c"
 )
 
 target_compile_definitions(${TARGET} PRIVATE

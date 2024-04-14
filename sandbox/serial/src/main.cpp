@@ -5,6 +5,7 @@
 
 #include "protocol/protocol_data.h"
 #include "communication/Serial.h"
+#include "communication/Telnet.h"
 
 std::ostream & operator<<(std::ostream &stream, const protocol_readings_t readings) {
 	stream << "press";
@@ -57,6 +58,34 @@ std::ostream & operator<<(std::ostream &stream, const protocol_estimation_t esti
 	return stream;
 }
 
+void receive(const int filter, const protocol_message_t &message) {
+	if(!(filter & (1<<message.id))) {
+		return;
+	}
+
+	switch(message.id) {
+		case PROTOCOL_ID_LOG: {
+			const char *str = reinterpret_cast<char *>(message.payload);
+			std::cout << std::string(str, message.size) << std::endl;
+		} break;
+		case PROTOCOL_ID_READINGS: {
+			const protocol_readings_t *readings = reinterpret_cast<protocol_readings_t *>(message.payload);
+			std::cout << *readings << std::endl;
+		} break;
+		case PROTOCOL_ID_PASSTHROUGH_GPS: {
+			const char *str = reinterpret_cast<char *>(message.payload);
+			std::cout << std::string(str, message.size);
+		} break;
+		case PROTOCOL_ID_ESTIMATION: {
+			const protocol_estimation_t *estimation = reinterpret_cast<protocol_estimation_t *>(message.payload);
+			std::cout << *estimation << std::endl;
+		} break;
+		default: {
+			std::cout << "unknown message" << std::endl;
+		} break;
+	}
+}
+
 int main(int argc, char *argv[]) {
 	QCoreApplication app(argc, argv);
 
@@ -67,34 +96,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	shared::Serial serial;
+	shared::Telnet telnet;
 
-	QObject::connect(&serial, &shared::Serial::receive, [&](const protocol_message_t &message) {
-		if(!(filter & (1<<message.id))) {
-			return;
-		}
-
-		switch(message.id) {
-			case PROTOCOL_ID_LOG: {
-				const char *str = reinterpret_cast<char *>(message.payload);
-				std::cout << std::string(str, message.size) << std::endl;
-			} break;
-			case PROTOCOL_ID_READINGS: {
-				const protocol_readings_t *readings = reinterpret_cast<protocol_readings_t *>(message.payload);
-				std::cout << *readings << std::endl;
-			} break;
-			case PROTOCOL_ID_PASSTHROUGH_GPS: {
-				const char *str = reinterpret_cast<char *>(message.payload);
-				std::cout << std::string(str, message.size);
-			} break;
-			case PROTOCOL_ID_ESTIMATION: {
-				const protocol_estimation_t *estimation = reinterpret_cast<protocol_estimation_t *>(message.payload);
-				std::cout << *estimation << std::endl;
-			} break;
-			default: {
-				std::cout << "unknown message" << std::endl;
-			} break;
-		}
-	});
+	QObject::connect(&serial, &shared::Serial::receive, std::bind(receive, filter, std::placeholders::_1));
+	QObject::connect(&telnet, &shared::Telnet::receive, std::bind(receive, filter, std::placeholders::_1));
 
 	return app.exec();
 }

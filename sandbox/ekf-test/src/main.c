@@ -16,7 +16,7 @@
 #include "nmea.h"
 #include "estimator.h"
 #include "nvm.h"
-#include "communication.h"
+#include "comm.h"
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
@@ -32,8 +32,11 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim10;
 TIM_HandleTypeDef htim11;
 
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart6;
+DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart1_tx;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 DMA_HandleTypeDef hdma_usart6_rx;
@@ -176,6 +179,18 @@ static void MX_TIM11_Init() {
     HAL_TIM_MspPostInit(&htim11);
 }
 
+static void MX_USART1_UART_Init() {
+    huart1.Instance = USART1;
+    huart1.Init.BaudRate = 115200;
+    huart1.Init.WordLength = UART_WORDLENGTH_8B;
+    huart1.Init.StopBits = UART_STOPBITS_1;
+    huart1.Init.Parity = UART_PARITY_NONE;
+    huart1.Init.Mode = UART_MODE_TX_RX;
+    huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart1);
+}
+
 static void MX_USART2_UART_Init() {
     huart2.Instance = USART2;
     huart2.Init.BaudRate = 115200;
@@ -231,8 +246,14 @@ static void MX_DMA_Init() {
     HAL_NVIC_SetPriority(DMA2_Stream1_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(DMA2_Stream1_IRQn);
 
+    HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+
     HAL_NVIC_SetPriority(DMA2_Stream6_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
+
+    HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 }
 
 static void MX_GPIO_Init() {
@@ -440,6 +461,9 @@ volatile uint8_t mag_ready = 0;
 volatile uint8_t bar_ready = 0;
 volatile uint8_t gps_ready = 0;
 
+comm_instance_t comm_esp = {.huart = &huart1};
+comm_instance_t comm_usb = {.huart = &huart2};
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if(GPIO_Pin==GPIO_PIN_0) {
 		// imu
@@ -471,8 +495,11 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 }
 
 void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
-    if(huart==&huart2) {
-        communication_event(COMMUNICATION_EVENT_RX_HALF);
+    if(huart==&huart1) {
+        comm_event(&comm_esp, COMM_EVENT_RX_HALF);
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+    } else if(huart==&huart2) {
+        comm_event(&comm_usb, COMM_EVENT_RX_HALF);
         HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     } else if(huart==&huart6) {
         gps_ready = 1;
@@ -480,28 +507,28 @@ void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    if(huart==&huart2) {
-        communication_event(COMMUNICATION_EVENT_RX_CPLT);
+    if(huart==&huart1) {
+        comm_event(&comm_esp, COMM_EVENT_RX_CPLT);
+    } else if(huart==&huart2) {
+        comm_event(&comm_usb, COMM_EVENT_RX_CPLT);
     } else if(huart==&huart6) {
         gps_ready = 2;
     }
 }
 
-void HAL_UART_TxHalfCpltCallback(UART_HandleTypeDef *huart) {
-    if(huart==&huart2) {
-        communication_event(COMMUNICATION_EVENT_TX_HALF);
-    }
-}
-
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
-    if(huart==&huart2) {
-        communication_event(COMMUNICATION_EVENT_TX_CPLT);
+    if(huart==&huart1) {
+        comm_event(&comm_esp, COMM_EVENT_TX_CPLT);
+    } else if(huart==&huart2) {
+        comm_event(&comm_usb, COMM_EVENT_TX_CPLT);
     }
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
-    if(huart==&huart2) {
-        communication_event(COMMUNICATION_EVENT_ERROR);
+    if(huart==&huart1) {
+        comm_event(&comm_esp, COMM_EVENT_ERROR);
+    } else if(huart==&huart2) {
+        comm_event(&comm_usb, COMM_EVENT_ERROR);
     }
 }
 
@@ -514,7 +541,8 @@ void transmit(const uint8_t id, const void *data, const uint16_t len) {
 
     uint8_t buffer[1024];
     const uint16_t size = protocol_encode(buffer, &message);
-    communication_transmit(buffer, size);
+    comm_transmit(&comm_usb, buffer, size);
+    comm_transmit(&comm_esp, buffer, size);
 }
 
 void logger(const char *format, ...) {
@@ -532,7 +560,8 @@ void logger(const char *format, ...) {
 
     uint8_t buffer[128];
     const uint16_t size = protocol_encode(buffer, &message);
-    communication_transmit(buffer, size);
+    comm_transmit(&comm_usb, buffer, size);
+    comm_transmit(&comm_esp, buffer, size);
 }
 
 int main() {
@@ -545,13 +574,15 @@ int main() {
     MX_I2C1_Init();
     MX_I2C2_Init();
     MX_I2C3_Init();
+    MX_USART1_UART_Init();
     MX_USART2_UART_Init();
     MX_USART6_UART_Init();
     MX_TIM2_Init();
     MX_TIM10_Init();
     MX_TIM11_Init();
 
-    communication_init();
+    comm_init(&comm_esp);
+    comm_init(&comm_usb);
 
     logger("system reset");
 
@@ -644,7 +675,24 @@ int main() {
         }
 
         uint8_t byte;
-        while(communication_receive(&byte)) {
+        while(comm_receive(&comm_esp, &byte)) {
+            protocol_message_t msg;
+            if(protocol_decode(&recv_decoder, byte, &msg)) {
+                switch(msg.id) {
+                    case PROTOCOL_ID_CALIBRATION: {
+                        if(msg.size==sizeof(protocol_calibration_t)) {
+                            nvm_write(0, msg.payload, msg.size);
+                        }
+
+                        protocol_calibration_t calibration;
+                        nvm_read(0, &calibration, sizeof(calibration));
+
+                        transmit(PROTOCOL_ID_CALIBRATION, &calibration, sizeof(calibration));
+                    } break;
+                }
+            }
+        }
+        while(comm_receive(&comm_usb, &byte)) {
             protocol_message_t msg;
             if(protocol_decode(&recv_decoder, byte, &msg)) {
                 switch(msg.id) {
