@@ -39,9 +39,9 @@ void Gyroscope::receive(const protocol_readings_t &readings) {
         const double w1 = static_cast<double>(n)/static_cast<double>(n + 1);
         const double w2 = 1./static_cast<double>(n + 1);
 
-        mean[0] = w1*mean[0] + w2*readings.gyroscope[0];
-        mean[1] = w1*mean[1] + w2*readings.gyroscope[1];
-        mean[2] = w1*mean[2] + w2*readings.gyroscope[2];
+        mean[0] = w1*mean[0] + w2*readings.raw.gyroscope[0];
+        mean[1] = w1*mean[1] + w2*readings.raw.gyroscope[1];
+        mean[2] = w1*mean[2] + w2*readings.raw.gyroscope[2];
         n++;
 
         line[0]->setText(QString::asprintf("%+7.4f", mean[0]));

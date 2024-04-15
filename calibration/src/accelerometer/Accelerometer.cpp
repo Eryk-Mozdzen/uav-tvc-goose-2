@@ -15,9 +15,9 @@ Interface * Accelerometer::create() const {
 
 void Accelerometer::receive(const protocol_readings_t &readings) {
     if(readings.valid.accelerometer) {
-        axisX.set(readings.accelerometer[0]);
-        axisY.set(readings.accelerometer[1]);
-        axisZ.set(readings.accelerometer[2]);
+        axisX.set(readings.raw.accelerometer[0]);
+        axisY.set(readings.raw.accelerometer[1]);
+        axisZ.set(readings.raw.accelerometer[2]);
     }
 }
 

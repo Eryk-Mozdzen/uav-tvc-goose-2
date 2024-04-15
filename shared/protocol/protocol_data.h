@@ -17,9 +17,16 @@ typedef enum {
 } protocol_id_t;
 
 typedef struct {
-    float magnetometer[3];
-    float accelerometer[3];
-    float gyroscope[3];
+    struct {
+        float magnetometer[3];
+        float accelerometer[3];
+        float gyroscope[3];
+    } raw;
+    struct {
+        float magnetometer[3];
+        float accelerometer[3];
+        float gyroscope[3];
+    } calibrated;
     float rangefinder;
     float barometer;
     float gps[2];

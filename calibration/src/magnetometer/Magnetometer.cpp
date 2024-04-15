@@ -93,9 +93,9 @@ void Magnetometer::receive(const protocol_readings_t &readings) {
     }
 
     const Sample s = {
-        readings.magnetometer[0],
-        readings.magnetometer[1],
-        readings.magnetometer[2]
+        readings.raw.magnetometer[0],
+        readings.raw.magnetometer[1],
+        readings.raw.magnetometer[2]
     };
 
     samples.push_back(s);
@@ -103,7 +103,7 @@ void Magnetometer::receive(const protocol_readings_t &readings) {
     const Eigen::VectorXd poly = bestFitEllipsoid(samples);
     const Params params = polyToParams3D(poly);
 
-    offset = params.offset;
+    offset = -params.getM()*params.offset;
     scale = params.getM();
 
     calibrated.set(params);

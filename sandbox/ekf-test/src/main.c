@@ -362,11 +362,11 @@ void qmc5883l_read(float *mag, const uint8_t *buffer) {
 	const int16_t raw_y = (((int16_t)buffer[3])<<8) | buffer[2];
 	const int16_t raw_z = (((int16_t)buffer[5])<<8) | buffer[4];
 
-	const float gain = 8.f/((float)(1<<16));
+	const float gain = 1.f/3000.f;
 
-	mag[0] = raw_x*gain;
-	mag[1] = raw_y*gain;
-	mag[2] = raw_z*gain;
+	mag[0] = -raw_z*gain;
+	mag[1] = +raw_x*gain;
+	mag[2] = -raw_y*gain;
 }
 
 void mpu6050_write(uint8_t address, uint8_t value) {
@@ -433,9 +433,9 @@ void mpu6050_read(float *acc, float *gyr, const uint8_t *buffer) {
 		const float gain = 65.5f;
 		const float dps_to_rads = 0.017453292519943f;
 
-		gyr[0] = raw_x*dps_to_rads/gain;
-		gyr[1] = raw_y*dps_to_rads/gain;
-		gyr[2] = raw_z*dps_to_rads/gain;
+		gyr[0] = +raw_z*dps_to_rads/gain;
+		gyr[1] = +raw_y*dps_to_rads/gain;
+		gyr[2] = -raw_x*dps_to_rads/gain;
 	}
 
 	{
@@ -446,9 +446,9 @@ void mpu6050_read(float *acc, float *gyr, const uint8_t *buffer) {
 		const float gain = 8192.f;
 		const float g_to_ms2 = 9.81f;
 
-		acc[0] = raw_x*g_to_ms2/gain;
-		acc[1] = raw_y*g_to_ms2/gain;
-		acc[2] = raw_z*g_to_ms2/gain;
+		acc[0] = -raw_z*g_to_ms2/gain;
+		acc[1] = -raw_y*g_to_ms2/gain;
+		acc[2] = +raw_x*g_to_ms2/gain;
 	}
 }
 
@@ -611,24 +611,42 @@ int main() {
 
     while(1) {
         readings.rangefinder = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
-        readings.valid.rangefinder = 1;
+        readings.valid.rangefinder = (readings.rangefinder<2.f);
 
         if(imu_ready) {
             imu_ready = 0;
-            mpu6050_read(readings.accelerometer, readings.gyroscope, imu_buffer);
+            mpu6050_read(readings.raw.accelerometer, readings.raw.gyroscope, imu_buffer);
             readings.valid.accelerometer = 1;
             readings.valid.gyroscope = 1;
 
-            ekf_correct_7_3(&ekf, &accelerometer_model, readings.accelerometer);
-            ekf_predict_7_3(&ekf, &rotation_model, readings.gyroscope);
+            protocol_calibration_t calibration;
+            nvm_read(0, &calibration, sizeof(calibration));
+
+            readings.calibrated.accelerometer[0] = calibration.accelerometer[0]*readings.raw.accelerometer[0] + calibration.accelerometer[1]*readings.raw.accelerometer[1] + calibration.accelerometer[2]*readings.raw.accelerometer[2] + calibration.accelerometer[9];
+            readings.calibrated.accelerometer[1] = calibration.accelerometer[3]*readings.raw.accelerometer[0] + calibration.accelerometer[4]*readings.raw.accelerometer[1] + calibration.accelerometer[5]*readings.raw.accelerometer[2] + calibration.accelerometer[10];
+            readings.calibrated.accelerometer[2] = calibration.accelerometer[6]*readings.raw.accelerometer[0] + calibration.accelerometer[7]*readings.raw.accelerometer[1] + calibration.accelerometer[8]*readings.raw.accelerometer[2] + calibration.accelerometer[11];
+
+            readings.calibrated.gyroscope[0] = readings.raw.gyroscope[0] + calibration.gyroscope[0];
+            readings.calibrated.gyroscope[1] = readings.raw.gyroscope[1] + calibration.gyroscope[1];
+            readings.calibrated.gyroscope[2] = readings.raw.gyroscope[2] + calibration.gyroscope[2];
+
+            ekf_correct_7_3(&ekf, &accelerometer_model, readings.calibrated.accelerometer);
+            ekf_predict_7_3(&ekf, &rotation_model, readings.calibrated.gyroscope);
         }
 
         if(mag_ready) {
             mag_ready = 0;
-            qmc5883l_read(readings.magnetometer, mag_buffer);
+            qmc5883l_read(readings.raw.magnetometer, mag_buffer);
             readings.valid.magnetometer = 1;
 
-            ekf_correct_7_3(&ekf, &magnetometer_model, readings.magnetometer);
+            protocol_calibration_t calibration;
+            nvm_read(0, &calibration, sizeof(calibration));
+
+            readings.calibrated.magnetometer[0] = calibration.magnetometer[0]*readings.raw.magnetometer[0] + calibration.magnetometer[1]*readings.raw.magnetometer[1] + calibration.magnetometer[2]*readings.raw.magnetometer[2] + calibration.magnetometer[9];
+            readings.calibrated.magnetometer[1] = calibration.magnetometer[3]*readings.raw.magnetometer[0] + calibration.magnetometer[4]*readings.raw.magnetometer[1] + calibration.magnetometer[5]*readings.raw.magnetometer[2] + calibration.magnetometer[10];
+            readings.calibrated.magnetometer[2] = calibration.magnetometer[6]*readings.raw.magnetometer[0] + calibration.magnetometer[7]*readings.raw.magnetometer[1] + calibration.magnetometer[8]*readings.raw.magnetometer[2] + calibration.magnetometer[11];
+
+            ekf_correct_7_3(&ekf, &magnetometer_model, readings.calibrated.magnetometer);
         }
 
         if(bar_ready) {

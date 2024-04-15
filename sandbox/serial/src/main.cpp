@@ -18,23 +18,23 @@ std::ostream & operator<<(std::ostream &stream, const protocol_readings_t readin
 
 	stream << "   mag [";
 	stream << std::setprecision(2) << std::fixed << std::showpos;
-	stream << std::setw(6) << (readings.valid.magnetometer ? readings.magnetometer[0] : std::nan(""));
-	stream << std::setw(6) << (readings.valid.magnetometer ? readings.magnetometer[1] : std::nan(""));
-	stream << std::setw(6) << (readings.valid.magnetometer ? readings.magnetometer[2] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.magnetometer ? readings.calibrated.magnetometer[0] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.magnetometer ? readings.calibrated.magnetometer[1] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.magnetometer ? readings.calibrated.magnetometer[2] : std::nan(""));
 	stream << "]";
 
 	stream << "   accel [";
 	stream << std::setprecision(2) << std::fixed << std::showpos;
-	stream << std::setw(6) << (readings.valid.accelerometer ? readings.accelerometer[0] : std::nan(""));
-	stream << std::setw(6) << (readings.valid.accelerometer ? readings.accelerometer[1] : std::nan(""));
-	stream << std::setw(6) << (readings.valid.accelerometer ? readings.accelerometer[2] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.accelerometer ? readings.calibrated.accelerometer[0] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.accelerometer ? readings.calibrated.accelerometer[1] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.accelerometer ? readings.calibrated.accelerometer[2] : std::nan(""));
 	stream << "]";
 
 	stream << "   gyro [";
 	stream << std::setprecision(2) << std::fixed << std::showpos;
-	stream << std::setw(6) << (readings.valid.gyroscope ? readings.gyroscope[0] : std::nan(""));
-	stream << std::setw(6) << (readings.valid.gyroscope ? readings.gyroscope[1] : std::nan(""));
-	stream << std::setw(6) << (readings.valid.gyroscope ? readings.gyroscope[2] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.gyroscope ? readings.calibrated.gyroscope[0] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.gyroscope ? readings.calibrated.gyroscope[1] : std::nan(""));
+	stream << std::setw(6) << (readings.valid.gyroscope ? readings.calibrated.gyroscope[2] : std::nan(""));
 	stream << "]";
 
 	stream << "   gps [";
