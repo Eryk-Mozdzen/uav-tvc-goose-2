@@ -3,6 +3,7 @@
 #include <drake/systems/framework/diagram_builder.h>
 
 #include "Simulator.h"
+#include "Square.h"
 #include "Circle.h"
 #include "Lemniscate.h"
 #include "Manual.h"
@@ -17,6 +18,7 @@ int main(int argc, char **argv) {
 
 	drake::systems::DiagramBuilder<double> builder;
 
+	//auto generator = builder.AddSystem<Square>(4, 0.5, 20);
 	//auto generator = builder.AddSystem<Circle>(0, 0, 2, 5);
 	auto generator = builder.AddSystem<Lemniscate>(2, 10);
 	//auto generator = builder.AddSystem<Manual>();

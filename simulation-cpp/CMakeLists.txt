@@ -16,6 +16,7 @@ add_executable(${PROJECT_NAME}
 	"src/main.cpp"
 	"src/base/TrajectoryGenerator.cpp"
 	"src/base/Controller.cpp"
+	"src/generators/Square.cpp"
 	"src/generators/Circle.cpp"
 	"src/generators/Lemniscate.cpp"
 	"src/generators/Manual.cpp"
