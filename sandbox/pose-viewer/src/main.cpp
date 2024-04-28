@@ -29,6 +29,24 @@ void receive(shared::Visualization3d &client, const protocol_message_t &message)
 				client.write("update goose.mag transform translation %f %f %f\n", norm[0], norm[1], norm[2]);
 			}
 		} break;
+		case PROTOCOL_ID_ESTIMATION: {
+			const protocol_estimation_t *estimation = reinterpret_cast<protocol_estimation_t *>(message.payload);
+
+			const float len = std::sqrt(
+				estimation->orientation[0]*estimation->orientation[0] +
+				estimation->orientation[1]*estimation->orientation[1] +
+				estimation->orientation[2]*estimation->orientation[2] +
+				estimation->orientation[3]*estimation->orientation[3]
+			);
+			printf("%f\n", len);
+
+			client.write("update goose transform quaternion %f %f %f %f\n",
+				estimation->orientation[0]/len,
+				estimation->orientation[1]/len,
+				estimation->orientation[2]/len,
+				estimation->orientation[3]/len
+			);
+		} break;
 	}
 }
 
@@ -43,7 +61,7 @@ int main(int argc, char *argv[]) {
 	client.write("create goose            empty\n");
 	client.write("create goose.acc        empty\n");
 	client.write("create goose.mag        empty\n");
-	client.write("create goose.marker     sphere material color 255 255 255 transform scale 0.05 0.05 0.05\n");
+	client.write("create goose.marker     cuboid material color 255 255 255 transform scale 0.20 0.10 0.05\n");
 	client.write("create goose.acc.marker sphere material color 0   255   0 transform scale 0.05 0.05 0.05\n");
 	client.write("create goose.mag.marker sphere material color 0   0   255 transform scale 0.05 0.05 0.05\n");
 

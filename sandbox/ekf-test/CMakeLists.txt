@@ -115,6 +115,7 @@ target_link_options(${TARGET} PRIVATE
 )
 
 target_link_libraries(${TARGET}
+	m
 	"${CMAKE_SOURCE_DIR}/../../third-party/cmsis_core/DSP/Lib/GCC/libarm_cortexM4lf_math.a"
 )
 

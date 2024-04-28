@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <math.h>
 
 #include "stm32f4xx_hal.h"
 
@@ -630,8 +631,22 @@ int main() {
             readings.calibrated.gyroscope[1] = readings.raw.gyroscope[1] + calibration.gyroscope[1];
             readings.calibrated.gyroscope[2] = readings.raw.gyroscope[2] + calibration.gyroscope[2];
 
-            ekf_correct_7_3(&ekf, &accelerometer_model, readings.calibrated.accelerometer);
-            ekf_predict_7_3(&ekf, &rotation_model, readings.calibrated.gyroscope);
+            const float acc_len = sqrtf(
+                readings.calibrated.accelerometer[0]*readings.calibrated.accelerometer[0] +
+                readings.calibrated.accelerometer[1]*readings.calibrated.accelerometer[1] +
+                readings.calibrated.accelerometer[2]*readings.calibrated.accelerometer[2]
+            );
+            const float acc_normalized[3] = {
+                readings.calibrated.accelerometer[0]/acc_len,
+                readings.calibrated.accelerometer[1]/acc_len,
+                readings.calibrated.accelerometer[2]/acc_len,
+            };
+
+            ekf_predict_5_3(&ekf, &rotation_model, readings.calibrated.gyroscope);
+
+            if(fabsf(acc_len-9.8065f)<0.05f) {
+                ekf_correct_5_3(&ekf, &accelerometer_model, acc_normalized);
+            }
         }
 
         if(mag_ready) {
@@ -646,7 +661,18 @@ int main() {
             readings.calibrated.magnetometer[1] = calibration.magnetometer[3]*readings.raw.magnetometer[0] + calibration.magnetometer[4]*readings.raw.magnetometer[1] + calibration.magnetometer[5]*readings.raw.magnetometer[2] + calibration.magnetometer[10];
             readings.calibrated.magnetometer[2] = calibration.magnetometer[6]*readings.raw.magnetometer[0] + calibration.magnetometer[7]*readings.raw.magnetometer[1] + calibration.magnetometer[8]*readings.raw.magnetometer[2] + calibration.magnetometer[11];
 
-            ekf_correct_7_3(&ekf, &magnetometer_model, readings.calibrated.magnetometer);
+            const float mag_len = sqrtf(
+                readings.calibrated.magnetometer[0]*readings.calibrated.magnetometer[0] +
+                readings.calibrated.magnetometer[1]*readings.calibrated.magnetometer[1] +
+                readings.calibrated.magnetometer[2]*readings.calibrated.magnetometer[2]
+            );
+            const float mag_normalized[3] = {
+                readings.calibrated.magnetometer[0]/mag_len,
+                readings.calibrated.magnetometer[1]/mag_len,
+                readings.calibrated.magnetometer[2]/mag_len,
+            };
+
+            ekf_correct_5_3(&ekf, &magnetometer_model, mag_normalized);
         }
 
         if(bar_ready) {
@@ -731,7 +757,11 @@ int main() {
         if((HAL_GetTick() - last)>100) {
             last = HAL_GetTick();
 
+            protocol_estimation_t estimation = {0};
+            memcpy(&estimation.orientation, ekf.x.pData, sizeof(estimation.orientation));
+
             transmit(PROTOCOL_ID_READINGS, &readings, sizeof(readings));
+            transmit(PROTOCOL_ID_ESTIMATION, &estimation, sizeof(estimation));
 
             readings.valid_all = 0;
         }
