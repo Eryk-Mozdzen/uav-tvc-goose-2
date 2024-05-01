@@ -2,7 +2,5 @@
 **/build
 **/.vscode
 
-sandbox/estimator/*.log
-sandbox/estimator/*.aux
-sandbox/estimator/*.pdf
-sandbox/estimator/*.tex
+sandbox/estimator/docs
+sandbox/estimator/src
