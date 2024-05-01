@@ -18,7 +18,7 @@ class Plant : public drake::systems::LeafSystem<double> {
     static Eigen::Matrix3d dW(const Q &q, const Q &dq);
 
 public:
-    Plant();
+    Plant(const Eigen::Vector<double, 2*dimQ> &initial);
 
     static Eigen::Matrix<double, dimQ, dimQ> M(const Q &q);
     static Eigen::Matrix<double, dimQ, dimQ> C(const Q &q, const Q &dq);

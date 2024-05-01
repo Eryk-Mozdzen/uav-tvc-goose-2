@@ -20,6 +20,7 @@ add_executable(${PROJECT_NAME}
 	"src/generators/Circle.cpp"
 	"src/generators/Lemniscate.cpp"
 	"src/generators/Manual.cpp"
+	"src/controllers/Simple.cpp"
 	"src/controllers/Simple2.cpp"
 	"src/plant/Plant.cpp"
 	"src/interface/VisualClient.cpp"

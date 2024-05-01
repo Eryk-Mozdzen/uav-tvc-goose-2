@@ -3,15 +3,22 @@
 
 double Plant::current_w = 1000;
 
-Plant::Plant() {
-    DeclareContinuousState(12);
-    DeclareVectorInputPort("control", 5);
+Plant::Plant(const Eigen::Vector<double, 2*dimQ> &initial) {
+    //DeclareContinuousState(12);
+    //DeclareContinuousState(drake::systems::BasicVector<double>{
+    //    2*std::sqrt(2), 0, 1, 0, 0, pi/2,
+    //    0, a*w, 0, 0, 0, 3*w
+    //});
+    DeclareContinuousState(drake::systems::BasicVector<double>(initial));
+
+    DeclareVectorInputPort("control", 4);
     DeclareVectorOutputPort("state", 12, &Plant::EvalOutput, {this->all_state_ticket()});
 }
 
 void Plant::DoCalcTimeDerivatives(const drake::systems::Context<double> &context, drake::systems::ContinuousState<double> *derivatives) const {
-    const Eigen::Vector<double, 5> real = EvalVectorInput(context, 0)->CopyToVector();
-    const Eigen::Vector<double, 4> U = Plant::encodeControls(real);
+    //const Eigen::Vector<double, 5> real = EvalVectorInput(context, 0)->CopyToVector();
+    //const Eigen::Vector<double, 4> U = Plant::encodeControls(real);
+    const Eigen::Vector<double, 4> U = EvalVectorInput(context, 0)->CopyToVector();
     const Eigen::Vector<double, 12> x = context.get_continuous_state_vector().CopyToVector();
 
     const Eigen::Vector<double, 6> q = x.segment(0, 6);
@@ -24,7 +31,8 @@ void Plant::DoCalcTimeDerivatives(const drake::systems::Context<double> &context
     dx.segment(0, 6) = dq;
     dx.segment(6, 6) = M(q).inverse()*(u - C(q, dq)*dq - D(q));
 
-    current_w = real(0);
+    //const Eigen::Vector<double, 5> real = Plant::decodeControls(U);
+    //current_w = real(0);
 
     derivatives->get_mutable_vector().SetFromVector(dx);
 }
@@ -85,7 +93,7 @@ Eigen::Matrix<double, Plant::dimQ, Plant::dimQ> Plant::C(const Q &q, const Q &dq
     Eigen::Matrix<double, dimQ, dimQ> C;
     C.setZero();
     C.block(0, 0, 3, 3) = Params::m*Rinv*dR(q, dq)*Rinv;
-    C.block(3, 3, 3, 3) = J*Winv*dW(q, dq)*Winv*L + C1*Winv*L + C2*Winv*L;
+    C.block(3, 3, 3, 3) = J*Winv*dW(q, dq)*Winv*L + C1*Winv*L;// + C2*Winv*L;
 
     C.row(0) +=C.row(4);
     C.row(1) -=C.row(3);
@@ -98,10 +106,10 @@ Eigen::Vector<double, Plant::dimQ> Plant::D(const Q &q) {
     D.setZero();
     D.block(0, 0, 3, 1) = Params::m*R(q).inverse()*Eigen::Vector3d(0, 0, Params::g);
 
-    const double Ft = Params::K_w*current_w*current_w;
-    const double Fs = Params::K_l*Ft*Params::a_s;
-    const double Mr = Params::K_m*current_w*current_w;
-    D(5) +=(4*Fs + Mr/Params::r);
+    //const double Ft = Params::K_w*current_w*current_w;
+    //const double Fs = Params::K_l*Ft*Params::a_s;
+    //const double Mr = Params::K_m*current_w*current_w;
+    //D(5) +=(4*Fs + Mr/Params::r);
 
     D.row(0) +=D.row(4);
     D.row(1) -=D.row(3);
@@ -251,7 +259,7 @@ Eigen::Vector<double, 5> Plant::decodeControls(const Eigen::Vector<double, 4> &g
     const double Cs = Fs/(Params::K_l*Ft);
     const double C = (Cs - C31 - C42)/2;
 
-    const double w = std::sqrt(Ft/Params::K_w);
+    const double w = Ft > 0 ? std::sqrt(Ft/Params::K_w) : -std::sqrt(-Ft/Params::K_w);
     const double a1 = 0.25*(2*C - C31 + C42);
     const double a2 = C - a1;
     const double a3 = C31 + a1;
