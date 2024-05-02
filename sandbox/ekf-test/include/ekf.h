@@ -188,10 +188,10 @@ typedef struct {
             .numCols = X, \
             .pData = I_data \
         }; \
-        for(uint8_t i=0; i<X*X; i++) { \
+        for(uint16_t i=0; i<X*X; i++) { \
             I.pData[i] = 0.f; \
         } \
-        for(uint8_t i=0; i<X; i++) { \
+        for(uint16_t i=0; i<X; i++) { \
             I.pData[i*X + i] = 1.f; \
         } \
  \

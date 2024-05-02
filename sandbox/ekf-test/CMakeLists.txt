@@ -31,6 +31,8 @@ add_executable(${TARGET}
 
 	"../../shared/protocol/protocol.c"
 
+	"../estimator/src/estimator.c"
+
 	"device/system_stm32f4xx.c"
 	"device/startup_stm32f411retx.s"
 	"device/syscalls.c"
@@ -42,7 +44,6 @@ add_executable(${TARGET}
 	"src/main.c"
 	"src/nmea.c"
 	"src/bmp280_compensate.c"
-	"src/estimator.c"
 	"src/nvm.c"
 	"src/comm.c"
 )
@@ -58,6 +59,7 @@ target_include_directories(${TARGET} PRIVATE
 	"../../third-party/stm32f4xx_hal_driver/Inc"
 	"../../third-party/cmsis_core/DSP/Include"
 	"../../shared/protocol"
+	"../estimator/src"
 	"HAL"
 	"include"
 )

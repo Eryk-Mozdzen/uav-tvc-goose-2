@@ -38,13 +38,15 @@ void receive(shared::Visualization3d &client, const protocol_message_t &message)
 				estimation->orientation[2]*estimation->orientation[2] +
 				estimation->orientation[3]*estimation->orientation[3]
 			);
-			printf("%f\n", len);
 
-			client.write("update goose transform quaternion %f %f %f %f\n",
+			client.write("update goose transform quaternion %f %f %f %f translation %f %f %f\n",
 				estimation->orientation[0]/len,
 				estimation->orientation[1]/len,
 				estimation->orientation[2]/len,
-				estimation->orientation[3]/len
+				estimation->orientation[3]/len,
+				estimation->position[0],
+				estimation->position[1],
+				estimation->position[2]
 			);
 		} break;
 	}

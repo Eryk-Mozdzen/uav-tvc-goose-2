@@ -7,6 +7,8 @@
 #include "communication/Serial.h"
 #include "communication/Telnet.h"
 
+constexpr float rad2deg = 57.2957795131f;
+
 std::ostream & operator<<(std::ostream &stream, const protocol_readings_t readings) {
 	stream << "press";
 	stream << std::setprecision(0) << std::fixed << std::noshowpos << std::setw(7);
@@ -53,6 +55,34 @@ std::ostream & operator<<(std::ostream &stream, const protocol_estimation_t esti
 	stream << std::setw(6) << estimation.orientation[1];
 	stream << std::setw(6) << estimation.orientation[2];
 	stream << std::setw(6) << estimation.orientation[3];
+	stream << "]";
+
+	stream << "   omega [";
+	stream << std::setprecision(2) << std::fixed << std::showpos;
+	stream << std::setw(6) << estimation.angular_velocity[0];
+	stream << std::setw(6) << estimation.angular_velocity[1];
+	stream << std::setw(6) << estimation.angular_velocity[2];
+	stream << "]";
+
+	stream << "   pos [";
+	stream << std::setprecision(2) << std::fixed << std::showpos;
+	stream << std::setw(6) << estimation.position[0];
+	stream << std::setw(6) << estimation.position[1];
+	stream << std::setw(6) << estimation.position[2];
+	stream << "]";
+
+	stream << "   vel [";
+	stream << std::setprecision(2) << std::fixed << std::showpos;
+	stream << std::setw(6) << estimation.velocity[0];
+	stream << std::setw(6) << estimation.velocity[1];
+	stream << std::setw(6) << estimation.velocity[2];
+	stream << "]";
+
+	stream << "   accel [";
+	stream << std::setprecision(2) << std::fixed << std::showpos;
+	stream << std::setw(6) << estimation.acceleration[0];
+	stream << std::setw(6) << estimation.acceleration[1];
+	stream << std::setw(6) << estimation.acceleration[2];
 	stream << "]";
 
 	return stream;

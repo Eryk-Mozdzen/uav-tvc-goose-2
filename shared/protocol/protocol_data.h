@@ -45,10 +45,12 @@ typedef struct {
 } protocol_readings_t;
 
 typedef struct {
+    float orientation[4];
+    float theta_d;
+    float angular_velocity[3];
     float position[3];
     float velocity[3];
-    float orientation[4];
-    float angular_velocity[3];
+    float acceleration[3];
     float pressure_0;
 } protocol_estimation_t;
 

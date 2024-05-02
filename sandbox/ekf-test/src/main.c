@@ -498,10 +498,8 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
     if(huart==&huart1) {
         comm_event(&comm_esp, COMM_EVENT_RX_HALF);
-        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     } else if(huart==&huart2) {
         comm_event(&comm_usb, COMM_EVENT_RX_HALF);
-        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     } else if(huart==&huart6) {
         gps_ready = 1;
     }
@@ -608,11 +606,25 @@ int main() {
     protocol_readings_t readings = {0};
     nmea_messaage_t nmea_message = {0};
 
-    uint32_t last = 0;
+    uint32_t last_transmission = 0;
+    uint32_t last_prediction = 0;
 
     while(1) {
-        readings.rangefinder = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
-        readings.valid.rangefinder = (readings.rangefinder<2.f);
+        const uint32_t time = HAL_GetTick();
+
+        if((time - last_prediction)>=1) {
+            last_prediction = time;
+
+            ekf_predict_18_0(&ekf, &system_model, NULL);
+        }
+
+        const float dist = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
+        if(dist<2.f) {
+            readings.rangefinder = dist;
+            readings.valid.rangefinder = 1;
+
+            ekf_correct_18_1(&ekf, &rangefinder_model, &readings.rangefinder);
+        }
 
         if(imu_ready) {
             imu_ready = 0;
@@ -631,22 +643,8 @@ int main() {
             readings.calibrated.gyroscope[1] = readings.raw.gyroscope[1] + calibration.gyroscope[1];
             readings.calibrated.gyroscope[2] = readings.raw.gyroscope[2] + calibration.gyroscope[2];
 
-            const float acc_len = sqrtf(
-                readings.calibrated.accelerometer[0]*readings.calibrated.accelerometer[0] +
-                readings.calibrated.accelerometer[1]*readings.calibrated.accelerometer[1] +
-                readings.calibrated.accelerometer[2]*readings.calibrated.accelerometer[2]
-            );
-            const float acc_normalized[3] = {
-                readings.calibrated.accelerometer[0]/acc_len,
-                readings.calibrated.accelerometer[1]/acc_len,
-                readings.calibrated.accelerometer[2]/acc_len,
-            };
-
-            ekf_predict_5_3(&ekf, &rotation_model, readings.calibrated.gyroscope);
-
-            if(fabsf(acc_len-9.8065f)<0.05f) {
-                ekf_correct_5_3(&ekf, &accelerometer_model, acc_normalized);
-            }
+            ekf_correct_18_3(&ekf, &accelerometer_model, readings.calibrated.accelerometer);
+            ekf_correct_18_3(&ekf, &gyroscope_model, readings.calibrated.gyroscope);
         }
 
         if(mag_ready) {
@@ -672,13 +670,16 @@ int main() {
                 readings.calibrated.magnetometer[2]/mag_len,
             };
 
-            ekf_correct_5_3(&ekf, &magnetometer_model, mag_normalized);
+            ekf_correct_18_3(&ekf, &magnetometer_model, mag_normalized);
         }
 
         if(bar_ready) {
             bar_ready = 0;
             bmp280_read(&readings.barometer, bar_buffer);
             readings.valid.barometer = 1;
+
+            ekf_correct_18_1(&ekf, &barometer_model, &readings.barometer);
+            HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
         }
 
         if(gps_ready) {
@@ -713,6 +714,8 @@ int main() {
 						readings.gps[0] = latitude;
                         readings.gps[1] = longitude;
                         readings.valid.gps = 1;
+
+                        //ekf_correct_18_2(&ekf, &gps_model, position);
 					}
 				}
 			}
@@ -754,11 +757,11 @@ int main() {
             }
         }
 
-        if((HAL_GetTick() - last)>100) {
-            last = HAL_GetTick();
+        if((time - last_transmission)>100) {
+            last_transmission = time;
 
             protocol_estimation_t estimation = {0};
-            memcpy(&estimation.orientation, ekf.x.pData, sizeof(estimation.orientation));
+            memcpy(&estimation, ekf.x.pData, sizeof(estimation));
 
             transmit(PROTOCOL_ID_READINGS, &readings, sizeof(readings));
             transmit(PROTOCOL_ID_ESTIMATION, &estimation, sizeof(estimation));
