@@ -1,4 +1,5 @@
 import sympy
+import sympy.codegen.ast
 from sympy import Symbol, Quaternion, Matrix
 import os
 from datetime import datetime
@@ -111,6 +112,10 @@ with open('src/estimator.c', 'w') as file:
         'cos': 'cosf',
     }
 
+    aliases = {
+        sympy.codegen.ast.real: sympy.codegen.ast.float32,
+    }
+
     def estimator(initial):
         x_dim = x.shape[0]
 
@@ -158,7 +163,7 @@ with open('src/estimator.c', 'w') as file:
         if len(f_used)>0:
             file.write('\n')
         for i in range(x_dim):
-            file.write('\tx_next->pData[' + str(i) + '] = ' + sympy.ccode(model[i], user_functions=functions) + ';\n')
+            file.write('\tx_next->pData[' + str(i) + '] = ' + sympy.ccode(model[i], user_functions=functions, type_aliases=aliases) + ';\n')
         file.write('}\n')
         file.write('\n')
         file.write('static void system_df(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {\n')
@@ -169,7 +174,7 @@ with open('src/estimator.c', 'w') as file:
             file.write('\n')
         for i in range(x_dim):
             for j in range(x_dim):
-                file.write('\tx_next->pData[' + str(i) + '*' + str(x_dim) + ' + ' + str(j) + '] = ' + sympy.ccode(model.jacobian(x)[i, j], user_functions=functions) + ';\n')
+                file.write('\tx_next->pData[' + str(i*x_dim + j) + '] = ' + sympy.ccode(model.jacobian(x)[i, j], user_functions=functions, type_aliases=aliases) + ';\n')
             if i!=(x_dim-1):
                 file.write('\n')
         file.write('}\n')
@@ -209,7 +214,7 @@ with open('src/estimator.c', 'w') as file:
         if len(h_used)>0:
             file.write('\n')
         for i in range(z_dim):
-            file.write('\tz->pData[' + str(i) + '] = ' + sympy.ccode(model[i], user_functions=functions) + ';\n')
+            file.write('\tz->pData[' + str(i) + '] = ' + sympy.ccode(model[i], user_functions=functions, type_aliases=aliases) + ';\n')
         file.write('}\n')
         file.write('\n')
         file.write('static void ' + name + '_dh(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {\n')
@@ -220,7 +225,7 @@ with open('src/estimator.c', 'w') as file:
             file.write('\n')
         for i in range(z_dim):
             for j in range(x_dim):
-                file.write('\tz->pData[' + str(i) + '*' + str(x_dim) + ' + ' + str(j) + '] = ' + sympy.ccode(model.jacobian(x)[i, j], user_functions=functions) + ';\n')
+                file.write('\tz->pData[' + str(i*x_dim + j) + '] = ' + sympy.ccode(model.jacobian(x)[i, j], user_functions=functions, type_aliases=aliases) + ';\n')
             if i!=(z_dim-1):
                 file.write('\n')
         file.write('}\n')
