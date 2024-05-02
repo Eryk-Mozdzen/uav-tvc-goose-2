@@ -105,11 +105,9 @@ with open('src/estimator.h', 'w') as file:
 with open('src/estimator.c', 'w') as file:
     functions = {
         'Pow': [
-            (lambda base, exponent: exponent==2, lambda base, exponent: '%s*%s' % (base, base)),
+            (lambda base, exponent: exponent==2, lambda base, exponent: '(%s)*(%s)' % (base, base)),
             (lambda base, exponent: exponent!=2, lambda base, exponent: 'powf(%s, %s)' % (base, exponent))
         ],
-        'sin': 'sinf',
-        'cos': 'cosf',
     }
 
     aliases = {
