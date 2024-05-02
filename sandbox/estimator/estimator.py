@@ -148,19 +148,25 @@ with open('src/estimator.c', 'w') as file:
 
     def system_model(model, variance):
         x_dim = x.shape[0]
+        f_used = list(model.free_symbols)
+        df_used = list(model.jacobian(x).free_symbols)
 
         file.write('static void system_f(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {\n')
         for i in range(x_dim):
-            file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
-        file.write('\n')
+            if x[i] in f_used:
+                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
+        if len(f_used)>0:
+            file.write('\n')
         for i in range(x_dim):
             file.write('\tx_next->pData[' + str(i) + '] = ' + sympy.ccode(model[i], user_functions=functions) + ';\n')
         file.write('}\n')
         file.write('\n')
         file.write('static void system_df(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {\n')
         for i in range(x_dim):
-            file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
-        file.write('\n')
+            if x[i] in df_used:
+                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
+        if len(df_used)>0:
+            file.write('\n')
         for i in range(x_dim):
             for j in range(x_dim):
                 file.write('\tx_next->pData[' + str(i) + '*' + str(x_dim) + ' + ' + str(j) + '] = ' + sympy.ccode(model.jacobian(x)[i, j], user_functions=functions) + ';\n')
@@ -193,19 +199,25 @@ with open('src/estimator.c', 'w') as file:
     def measurement_model(name, model, variance):
         x_dim = x.shape[0]
         z_dim = model.shape[0]
+        h_used = list(model.free_symbols)
+        dh_used = list(model.jacobian(x).free_symbols)
 
         file.write('static void ' + name + '_h(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {\n')
         for i in range(x_dim):
-            file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
-        file.write('\n')
+            if x[i] in h_used:
+                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
+        if len(h_used)>0:
+            file.write('\n')
         for i in range(z_dim):
             file.write('\tz->pData[' + str(i) + '] = ' + sympy.ccode(model[i], user_functions=functions) + ';\n')
         file.write('}\n')
         file.write('\n')
         file.write('static void ' + name + '_dh(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {\n')
         for i in range(x_dim):
-            file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
-        file.write('\n')
+            if x[i] in dh_used:
+                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
+        if len(dh_used)>0:
+            file.write('\n')
         for i in range(z_dim):
             for j in range(x_dim):
                 file.write('\tz->pData[' + str(i) + '*' + str(x_dim) + ' + ' + str(j) + '] = ' + sympy.ccode(model.jacobian(x)[i, j], user_functions=functions) + ';\n')
