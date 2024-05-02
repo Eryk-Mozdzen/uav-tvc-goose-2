@@ -1,56 +1,41 @@
-#include <cassert>
-
-#include "Object.h"
+#include "Plant.h"
 #include "Params.h"
 
-double Object::w_t = 0;
+double Plant::current_w = 1000;
 
-Object::Object() {
-    q.setZero();
-    dq.setZero();
-
-    dq_last.setZero();
-    ddq_last.setZero();
-
-    assert(!q.hasNaN());
-    assert(!dq.hasNaN());
-    assert(!dq_last.hasNaN());
-    assert(!ddq_last.hasNaN());
+Plant::Plant() {
+    DeclareContinuousState(12);
+    DeclareVectorInputPort("control", 5);
+    DeclareVectorOutputPort("state", 12, &Plant::EvalOutput, {this->all_state_ticket()});
 }
 
-void Object::step(const double dt, const U &u) {
-    Q input;
-    input.setZero();
-    input.block(2, 0, 4, 1) = u;
+void Plant::DoCalcTimeDerivatives(const drake::systems::Context<double> &context, drake::systems::ContinuousState<double> *derivatives) const {
+    const Eigen::Vector<double, 5> real = EvalVectorInput(context, 0)->CopyToVector();
+    const Eigen::Vector<double, 4> U = Plant::encodeControls(real);
+    const Eigen::Vector<double, 12> x = context.get_continuous_state_vector().CopyToVector();
 
-    assert(!u.hasNaN());
-    assert(!q.hasNaN());
-    assert(!dq.hasNaN());
-    assert(!dq_last.hasNaN());
-    assert(!ddq_last.hasNaN());
+    const Eigen::Vector<double, 6> q = x.segment(0, 6);
+    const Eigen::Vector<double, 6> dq = x.segment(6, 6);
+    Eigen::Vector<double, 6> u;
+    u.segment(0, 2).setZero();
+    u.segment(2, 4) = U;
 
-    const Q ddq = M(q).inverse()*(input - C(q, dq)*dq - D(q));
+    Eigen::Vector<double, 12> dx;
+    dx.segment(0, 6) = dq;
+    dx.segment(6, 6) = M(q).inverse()*(u - C(q, dq)*dq - D(q));
 
-    dq +=dt*0.5*(ddq_last + ddq);
-    q +=dt*0.5*(dq_last + dq);
+    current_w = real(0);
 
-    dq_last = dq;
-    ddq_last = ddq;
-
-    Object::w_t = Object::decodeControls(u).omega;
-
-    assert(!ddq.hasNaN());
-    assert(!dq.hasNaN());
-    assert(!q.hasNaN());
+    derivatives->get_mutable_vector().SetFromVector(dx);
 }
 
-Object::State Object::getState() const {
-    return {q, dq};
+void Plant::EvalOutput(const drake::systems::Context<double> &context, drake::systems::BasicVector<double> *output) const {
+    const drake::systems::VectorBase<double> &state = context.get_continuous_state_vector();
+
+    output->SetFrom(state);
 }
 
-Eigen::Matrix<double, Object::dimQ, Object::dimQ> Object::M(const Q &q) {
-    assert(!q.hasNaN());
-
+Eigen::Matrix<double, Plant::dimQ, Plant::dimQ> Plant::M(const Q &q) {
     const Eigen::DiagonalMatrix<double, 3, 3> J(Params::J_xx, Params::J_yy, Params::J_zz);
     const Eigen::DiagonalMatrix<double, 3, 3> L(1/Params::l, 1/Params::l, -1/Params::r);
 
@@ -63,15 +48,10 @@ Eigen::Matrix<double, Object::dimQ, Object::dimQ> Object::M(const Q &q) {
     M.row(0) +=M.row(4);
     M.row(1) -=M.row(3);
 
-    assert(!M.hasNaN());
-
     return M;
 }
 
-Eigen::Matrix<double, Object::dimQ, Object::dimQ> Object::C(const Q &q, const Q &dq) {
-    assert(!q.hasNaN());
-    assert(!dq.hasNaN());
-
+Eigen::Matrix<double, Plant::dimQ, Plant::dimQ> Plant::C(const Q &q, const Q &dq) {
     const Eigen::DiagonalMatrix<double, 3, 3> J(Params::J_xx, Params::J_yy, Params::J_zz);
     const Eigen::DiagonalMatrix<double, 3, 3> L(1/Params::l, 1/Params::l, -1/Params::r);
 
@@ -97,13 +77,12 @@ Eigen::Matrix<double, Object::dimQ, Object::dimQ> Object::C(const Q &q, const Q 
     };
 
     const Eigen::Matrix3d C2 {
-        { 0,                       Params::J_r*Object::w_t, 0},
-        {-Params::J_r*Object::w_t, 0,                       0},
-        { 0,                       0,                       0}
+        { 0,                     Params::J_r*current_w, 0},
+        {-Params::J_r*current_w, 0,                     0},
+        { 0,                     0,                     0}
     };
 
     Eigen::Matrix<double, dimQ, dimQ> C;
-
     C.setZero();
     C.block(0, 0, 3, 3) = Params::m*Rinv*dR(q, dq)*Rinv;
     C.block(3, 3, 3, 3) = J*Winv*dW(q, dq)*Winv*L + C1*Winv*L + C2*Winv*L;
@@ -111,35 +90,26 @@ Eigen::Matrix<double, Object::dimQ, Object::dimQ> Object::C(const Q &q, const Q 
     C.row(0) +=C.row(4);
     C.row(1) -=C.row(3);
 
-    assert(!C.hasNaN());
-
     return C;
 }
 
-Eigen::Vector<double, Object::dimQ> Object::D(const Q &q) {
-    assert(!q.hasNaN());
-
+Eigen::Vector<double, Plant::dimQ> Plant::D(const Q &q) {
     Eigen::Vector<double, dimQ> D;
-
     D.setZero();
     D.block(0, 0, 3, 1) = Params::m*R(q).inverse()*Eigen::Vector3d(0, 0, Params::g);
 
-    const double Ft = Params::K_w*Object::w_t*Object::w_t;
+    const double Ft = Params::K_w*current_w*current_w;
     const double Fs = Params::K_l*Ft*Params::a_s;
-    const double Mr = Params::K_m*Object::w_t*Object::w_t;
+    const double Mr = Params::K_m*current_w*current_w;
     D(5) +=(4*Fs + Mr/Params::r);
 
     D.row(0) +=D.row(4);
     D.row(1) -=D.row(3);
 
-    assert(!D.hasNaN());
-
     return D;
 }
 
-Eigen::Matrix3d Object::R(const Q &q) {
-    assert(!q.hasNaN());
-
+Eigen::Matrix3d Plant::R(const Q &q) {
     const double phi = q(3);
     const double theta = q(4);
     const double psi = q(5);
@@ -171,14 +141,10 @@ Eigen::Matrix3d Object::R(const Q &q) {
 
     const Eigen::Matrix3d R = Rz*Ry*Rx;
 
-    assert(!R.hasNaN());
-
     return R;
 }
 
-Eigen::Matrix3d Object::W(const Q &q) {
-    assert(!q.hasNaN());
-
+Eigen::Matrix3d Plant::W(const Q &q) {
     const double phi = q(3);
     const double theta = q(4);
 
@@ -193,14 +159,10 @@ Eigen::Matrix3d Object::W(const Q &q) {
         {0, s_phi/c_theta,  c_phi/c_theta},
     };
 
-    assert(!W.hasNaN());
-
     return W;
 }
 
-Eigen::Matrix3d Object::dR(const Q &q, const Q &dq) {
-    assert(!q.hasNaN());
-
+Eigen::Matrix3d Plant::dR(const Q &q, const Q &dq) {
     const double phi = q(3);
     const double theta = q(4);
     const double psi = q(5);
@@ -254,14 +216,10 @@ Eigen::Matrix3d Object::dR(const Q &q, const Q &dq) {
 
     const Eigen::Matrix3d dR = dRz*Ry*Rx + Rz*dRy*Rx + Rz*Ry*dRx;
 
-    assert(!dR.hasNaN());
-
     return dR;
 }
 
-Eigen::Matrix3d Object::dW(const Q &q, const Q &dq) {
-    assert(!q.hasNaN());
-
+Eigen::Matrix3d Plant::dW(const Q &q, const Q &dq) {
     const double phi = q(3);
     const double theta = q(4);
 
@@ -279,38 +237,41 @@ Eigen::Matrix3d Object::dW(const Q &q, const Q &dq) {
         {0,  sec_theta*(sin_phi*tan_theta*d_theta + cos_phi*d_phi),          sec_theta*(cos_phi*tan_theta*d_theta - sin_phi*d_phi)        },
     };
 
-    assert(!dW.hasNaN());
-
     return dW;
 }
 
-Object::Control Object::decodeControls(const U &general) {
-    Control real;
-    real.omega = std::sqrt(general(0)/Params::K_w);
+Eigen::Vector<double, 5> Plant::decodeControls(const Eigen::Vector<double, 4> &generalized) {
+    const double Ft = generalized(0);
+    const double F31 = generalized(1);
+    const double F42 = generalized(2);
+    const double Fs = generalized(3);
 
-    if(std::isnan(real.omega)) {
-        real.omega = 0.001;
-    }
-
-    const double C31 = general(1)/(Params::K_l*general(0));
-    const double C42 = general(2)/(Params::K_l*general(0));
-    const double Cs = general(3)/(Params::K_l*general(0));
+    const double C31 = F31/(Params::K_l*Ft);
+    const double C42 = F42/(Params::K_l*Ft);
+    const double Cs = Fs/(Params::K_l*Ft);
     const double C = (Cs - C31 - C42)/2;
 
-    real.alpha[0] = (2*C - C31 + C42)/4;
-    real.alpha[1] = C - real.alpha[0];
-    real.alpha[2] = C31 + real.alpha[0];
-    real.alpha[3] = C42 + C - real.alpha[0];
+    const double w = std::sqrt(Ft/Params::K_w);
+    const double a1 = 0.25*(2*C - C31 + C42);
+    const double a2 = C - a1;
+    const double a3 = C31 + a1;
+    const double a4 = C42 + C - a1;
 
-    return real;
+    return {w, a1, a2, a3, a4};
 }
 
-Object::U Object::encodeControls(const Control &real) {
-    const double F_t = Params::K_w*real.omega*real.omega;
-    const double F_1 = Params::K_l*F_t*real.alpha[0];
-    const double F_2 = Params::K_l*F_t*real.alpha[1];
-    const double F_3 = Params::K_l*F_t*real.alpha[2];
-    const double F_4 = Params::K_l*F_t*real.alpha[3];
+Eigen::Vector<double, 4> Plant::encodeControls(const Eigen::Vector<double, 5> &real) {
+    const double w = real(0);
+    const double a1 = real(1);
+    const double a2 = real(2);
+    const double a3 = real(3);
+    const double a4 = real(4);
+
+    const double F_t = Params::K_w*w*w;
+    const double F_1 = Params::K_l*F_t*a1;
+    const double F_2 = Params::K_l*F_t*a2;
+    const double F_3 = Params::K_l*F_t*a3;
+    const double F_4 = Params::K_l*F_t*a4;
 
     return {
         F_t,

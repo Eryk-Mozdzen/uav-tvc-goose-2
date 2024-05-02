@@ -2,8 +2,5 @@
 **/build
 **/.vscode
 
-**/.metadata
-**/.settings
-**/*.launch
-**/.cproject
-**/Debug
+sandbox/estimator/docs
+sandbox/estimator/src

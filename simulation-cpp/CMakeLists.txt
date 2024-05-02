@@ -3,9 +3,8 @@ cmake_minimum_required(VERSION 3.16)
 project(simulation-cpp)
 
 set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
 
-find_package(Eigen3 REQUIRED)
+find_package(drake REQUIRED)
 find_package(Qt5 COMPONENTS
 	Widgets
 	Network
@@ -15,36 +14,39 @@ REQUIRED)
 
 add_executable(${PROJECT_NAME}
 	"src/main.cpp"
-	"src/graphs/Chart.cpp"
-	"src/graphs/GraphXY.cpp"
-	"src/interface/Client.cpp"
-	"src/interface/Gamepad.cpp"
-	"src/simulation/Object.cpp"
-	"src/simulation/Simulation.cpp"
-	"src/controllers/PFL.cpp"
-	"src/generators/Manual.cpp"
-	"src/generators/Lemniscate.cpp"
+	"src/base/TrajectoryGenerator.cpp"
+	"src/base/Controller.cpp"
+	"src/generators/Square.cpp"
 	"src/generators/Circle.cpp"
+	"src/generators/Lemniscate.cpp"
+	"src/generators/Manual.cpp"
+	"src/controllers/Simple2.cpp"
+	"src/plant/Plant.cpp"
+	"src/interface/VisualClient.cpp"
+	"src/interface/GraphXY.cpp"
+	"src/interface/Chart.cpp"
+	"src/interface/Gamepad.cpp"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
 	"src"
-	"src/graphs"
-	"src/interface"
-	"src/abstract"
-	"src/simulation"
-	"src/controllers"
+	"src/base"
 	"src/generators"
+	"src/controllers"
+	"src/plant"
+	"src/interface"
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE
+	-std=c++20
+	-O3
 	-Wall
 	-Wextra
 	-Wpedantic
 )
 
 target_link_libraries(${PROJECT_NAME}
-	Eigen3::Eigen
+	drake::drake
 	Qt5::Widgets
 	Qt5::Network
 	Qt5::Gamepad

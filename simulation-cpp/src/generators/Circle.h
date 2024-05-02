@@ -2,16 +2,16 @@
 
 #include "TrajectoryGenerator.h"
 
-class Circle : public TrajectoryGenerator<4> {
+class Circle : public TrajectoryGenerator {
 	static constexpr double pi = 3.14159265359;
 
 	const double x;
 	const double y;
-	const double r;
+	const double R;
 	const double w;
 
-public:
-	Circle(const double x, const double y, const double r, const double T);
+	Eigen::VectorX<double> value(const double &time) const;
 
-	Trajectory get(const double time);
+public:
+	Circle(const double x, const double y, const double R, const double T);
 };

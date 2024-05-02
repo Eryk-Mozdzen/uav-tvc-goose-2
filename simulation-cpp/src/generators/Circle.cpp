@@ -1,32 +1,32 @@
 #include "Circle.h"
 
-Circle::Circle(const double x, const double y, const double r, const double T) : x{x}, y{y}, r{r}, w{2*pi/T} {
+Circle::Circle(const double x, const double y, const double R, const double T) : TrajectoryGenerator{4, 3}, x{x}, y{y}, R{R}, w{2*pi/T} {
 
 }
 
-Circle::Trajectory Circle::get(const double time) {
+Eigen::VectorX<double> Circle::value(const double &time) const {
     const double s = std::sin(w*time);
     const double c = std::cos(w*time);
 
-    Trajectory trajectory;
+    Eigen::Vector<double, 12> trajectory;
 
-    trajectory.y = Eigen::Vector<double, 4>{
-        r*c + x,
-        r*s + y,
+    trajectory.segment(0, 4) = Eigen::Vector<double, 4>{
+        R*c + x,
+        R*s + y,
         1,
         w*time + pi/2
     };
 
-    trajectory.dy = Eigen::Vector<double, 4>{
-        -r*w*s,
-        r*w*c,
+    trajectory.segment(4, 4) = Eigen::Vector<double, 4>{
+        -R*w*s,
+        R*w*c,
         0,
         w
     };
 
-    trajectory.ddy = Eigen::Vector<double, 4>{
-        -r*w*w*c,
-        -r*w*w*s,
+    trajectory.segment(8, 4) = Eigen::Vector<double, 4>{
+        -R*w*w*c,
+        -R*w*w*s,
         0,
         0
     };

@@ -1,10 +1,10 @@
 #include <QGamepad>
-#include <QDebug>
 #include <QTimer>
 
 #include "Gamepad.h"
 
-Gamepad::Gamepad(QObject *parent) : QObject{parent}, analog{QVector<float>(6)}, digital{QVector<bool>(15)} {
+Gamepad::Gamepad(QObject *parent) : QObject{parent} {
+    mutex = std::make_unique<std::mutex>();
 
     QTimer *timer = new QTimer(this);
     timer->start(100);
@@ -19,8 +19,6 @@ Gamepad::Gamepad(QObject *parent) : QObject{parent}, analog{QVector<float>(6)}, 
         timer->stop();
 
         QGamepad *gamepad = new QGamepad(*list.begin(), this);
-
-		qDebug() << "gamepad connected";
 
         connect(gamepad, &QGamepad::axisLeftXChanged,    this, std::bind(&Gamepad::updateA, this, Analog::LX,           std::placeholders::_1));
         connect(gamepad, &QGamepad::axisLeftYChanged,    this, std::bind(&Gamepad::updateA, this, Analog::LY,           std::placeholders::_1));
@@ -49,7 +47,7 @@ Gamepad::Gamepad(QObject *parent) : QObject{parent}, analog{QVector<float>(6)}, 
                 return;
             }
 
-            QMutexLocker locker(&mutex);
+            std::unique_lock<std::mutex> lock(*mutex);
 
 			for(float &value : analog) {
 				value = 0;
@@ -61,29 +59,36 @@ Gamepad::Gamepad(QObject *parent) : QObject{parent}, analog{QVector<float>(6)}, 
 
             delete gamepad;
 
-			qDebug() << "gamepad disconnected";
-
             timer->start();
         });
     });
-}
 
-float Gamepad::get(Analog input) {
-    QMutexLocker locker(&mutex);
-    return analog[input];
-}
-
-bool Gamepad::get(Digital input) {
-    QMutexLocker locker(&mutex);
-    return digital[input];
+    DeclareVectorOutputPort("analog", 4, &Gamepad::EvalAnalog);
 }
 
 void Gamepad::updateA(const Analog input, const float value) {
-    QMutexLocker locker(&mutex);
+    std::unique_lock<std::mutex> lock(*mutex);
     analog[input] = value;
 }
 
 void Gamepad::updateD(const Digital input, const bool value) {
-    QMutexLocker locker(&mutex);
+    std::unique_lock<std::mutex> lock(*mutex);
     digital[input] = value;
+}
+
+void Gamepad::EvalAnalog(const drake::systems::Context<double> &context, drake::systems::BasicVector<double> *output) const {
+    (void)context;
+
+    std::unique_lock<std::mutex> lock(*mutex);
+
+    const Eigen::Vector4d input {
+         analog[LX],
+        -analog[LY],
+        -analog[RX],
+         analog[RY]
+    };
+
+    lock.unlock();
+
+    output->SetFromVector(input);
 }

@@ -1,94 +1,69 @@
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-
+#include <fstream>
 #include <QApplication>
-#include <QTimer>
+#include <drake/systems/framework/diagram_builder.h>
 
-#include "Client.h"
-#include "Chart.h"
-#include "GraphXY.h"
-#include "Simulation.h"
-#include "PFL.h"
-#include "TrajectoryGenerator.h"
-#include "Manual.h"
-#include "Lemniscate.h"
+#include "Simulator.h"
+#include "Square.h"
 #include "Circle.h"
-
-TrajectoryGenerator<4> * createGenerator(int argc, char **argv) {
-	std::string contents;
-
-    for(int i=1; i<argc; i++) {
-        contents +=argv[i];
-
-        if(i!=argc-1) {
-            contents +=' ';
-        }
-    }
-
-	std::istringstream stream(contents);
-
-	std::string type;
-	stream >> type;
-
-	if(type=="manual") {
-		return new Manual();
-	} else if(type=="lemniscate") {
-		float c, T;
-		stream >> c >> T;
-		return new Lemniscate(c, T);
-	} else if(type=="circle") {
-		float x, y, R, T;
-		stream >> x >> y >> R >> T;
-		return new Circle(x, y, R, T);
-	}
-
-	std::cerr << "undefined trajectory generator" << std::endl;
-
-	return nullptr;
-}
+#include "Lemniscate.h"
+#include "Manual.h"
+#include "Simple2.h"
+#include "Plant.h"
+#include "VisualClient.h"
+#include "GraphXY.h"
+#include "Chart.h"
 
 int main(int argc, char **argv) {
 	QApplication app(argc, argv);
 
-	Simulation simulation(
-		new PFL(),
-		createGenerator(argc, argv)
-	);
+	drake::systems::DiagramBuilder<double> builder;
 
-	Client client;
-	Chart chartAlpha("Thrust Vanes Angles", "α [°]", "%+.1f", -15, 15);
-	Chart chartOmega("Rotor Angular Velocity", "ω [rad/s]", "%.0f", 0, 2000);
-	GraphXY graph("XY Trajectory", "%+.1f", 4);
+	//auto generator = builder.AddSystem<Square>(4, 0.5, 20);
+	//auto generator = builder.AddSystem<Circle>(0, 0, 2, 5);
+	auto generator = builder.AddSystem<Lemniscate>(2, 10);
+	//auto generator = builder.AddSystem<Manual>();
+	auto controller = builder.AddSystem<Simple2>();
+	auto plant = builder.AddSystem<Plant>();
+	auto client = builder.AddSystem<VisualClient>();
+	auto trajectory_xy = builder.AddSystem<GraphXY>("trajectory XY", "%+2.0f", 4);
+	auto actuators_rotor = builder.AddSystem<Chart>("rotor", "velocity [rad/s]", "%4.0f", 0, 2000);
+	auto actuators_vanes = builder.AddSystem<Chart>("vanes", "angle [deg]", "%+3.0f", -10, 10);
 
-	Chart::Series alpha1(chartAlpha, Qt::red);
-	Chart::Series alpha2(chartAlpha, Qt::green);
-	Chart::Series alpha3(chartAlpha, Qt::blue);
-	Chart::Series alpha4(chartAlpha, Qt::magenta);
-	Chart::Series omega(chartOmega);
-	GraphXY::Series trajectory(graph, Qt::black, Qt::DashLine, 1);
-	GraphXY::Series position(graph, Qt::red);
+	trajectory_xy->AddSeries("desired", Eigen::Matrix<double, 2, 12>({
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	}), Qt::black, Qt::DashLine, 1);
+	trajectory_xy->AddSeries("current", Eigen::Matrix<double, 2, 12>({
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	}), Qt::red, Qt::SolidLine, 2);
+	actuators_rotor->AddSeries("rotor", Eigen::Vector<double, 5>({1, 0, 0, 0, 0}), Qt::black, Qt::SolidLine, 2);
+	actuators_vanes->AddSeries("vanes", Eigen::Matrix<double, 4, 5>({
+		{0, 1, 0, 0, 0},
+		{0, 0, 1, 0, 0},
+		{0, 0, 0, 1, 0},
+		{0, 0, 0, 0, 1}
+	})*57.2957);
 
-	QTimer timer;
+	builder.Connect(generator->get_output_port(), controller->get_trajectory_input_port());
+	builder.Connect(generator->get_output_port(), trajectory_xy->GetInputPort("desired"));
+	builder.Connect(controller->get_control_output_port(), plant->get_input_port());
+	builder.Connect(controller->get_control_output_port(), actuators_rotor->GetInputPort("rotor"));
+	builder.Connect(controller->get_control_output_port(), actuators_vanes->GetInputPort("vanes"));
+	builder.Connect(plant->get_output_port(), controller->get_state_input_port());
+	builder.Connect(plant->get_output_port(), trajectory_xy->GetInputPort("current"));
+	builder.Connect(plant->get_output_port(), client->get_input_port());
 
-    QObject::connect(&timer, &QTimer::timeout, [&](){
+	auto diagram = builder.Build();
 
-		const Simulation::Result result = simulation.read();
+	std::ofstream file("diagram.dot");
+    file << diagram->GetGraphvizString();
+    file.close();
 
-		constexpr double rad2deg = 180/3.1415;
-
-		alpha1.append(result.control.alpha[0]*rad2deg);
-		alpha2.append(result.control.alpha[1]*rad2deg);
-		alpha3.append(result.control.alpha[2]*rad2deg);
-		alpha4.append(result.control.alpha[3]*rad2deg);
-		omega.append(result.control.omega);
-		trajectory.append(result.desired.y(0), result.desired.y(1));
-		position.append(result.state.q(0), result.state.q(1));
-
-		client.draw(result.state);
-    });
-
-	timer.start(20);
+	Simulator<double> simulator(*diagram);
+	simulator.set_target_realtime_rate(1);
+	simulator.Initialize();
+	simulator.StartAdvance();
 
 	return app.exec();
 }
