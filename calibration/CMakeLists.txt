@@ -21,7 +21,6 @@ add_executable(${PROJECT_NAME}
 	"src/magnetometer/Magnetometer.cpp"
 	"src/magnetometer/Viewer.cpp"
 	"src/accelerometer/Accelerometer.cpp"
-	"src/accelerometer/Axis.cpp"
 	"src/gyroscope/Gyroscope.cpp"
 	"src/servos/Servos.cpp"
 )

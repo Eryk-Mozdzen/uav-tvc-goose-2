@@ -46,11 +46,12 @@ typedef struct {
 
 typedef struct {
     float orientation[4];
-    float theta_d;
-    float angular_velocity[3];
     float position[3];
     float velocity[3];
-    float acceleration[3];
+    float accelerometer_bias[3];
+    float gyroscope_bias[3];
+    float magnetometer_bias[3];
+    float magnetic_field_0[3];
     float pressure_0;
 } protocol_estimation_t;
 

@@ -57,13 +57,6 @@ std::ostream & operator<<(std::ostream &stream, const protocol_estimation_t esti
 	stream << std::setw(6) << estimation.orientation[3];
 	stream << "]";
 
-	stream << "   omega [";
-	stream << std::setprecision(2) << std::fixed << std::showpos;
-	stream << std::setw(6) << estimation.angular_velocity[0];
-	stream << std::setw(6) << estimation.angular_velocity[1];
-	stream << std::setw(6) << estimation.angular_velocity[2];
-	stream << "]";
-
 	stream << "   pos [";
 	stream << std::setprecision(2) << std::fixed << std::showpos;
 	stream << std::setw(6) << estimation.position[0];
@@ -76,13 +69,6 @@ std::ostream & operator<<(std::ostream &stream, const protocol_estimation_t esti
 	stream << std::setw(6) << estimation.velocity[0];
 	stream << std::setw(6) << estimation.velocity[1];
 	stream << std::setw(6) << estimation.velocity[2];
-	stream << "]";
-
-	stream << "   accel [";
-	stream << std::setprecision(2) << std::fixed << std::showpos;
-	stream << std::setw(6) << estimation.acceleration[0];
-	stream << std::setw(6) << estimation.acceleration[1];
-	stream << std::setw(6) << estimation.acceleration[2];
 	stream << "]";
 
 	return stream;

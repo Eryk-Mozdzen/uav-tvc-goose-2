@@ -445,7 +445,7 @@ void mpu6050_read(float *acc, float *gyr, const uint8_t *buffer) {
 		const int16_t raw_z = (((int16_t)buffer[4])<<8) | buffer[5];
 
 		const float gain = 8192.f;
-		const float g_to_ms2 = 9.81f;
+		const float g_to_ms2 = 9.80665f;
 
 		acc[0] = -raw_z*g_to_ms2/gain;
 		acc[1] = -raw_y*g_to_ms2/gain;
@@ -607,23 +607,23 @@ int main() {
     nmea_messaage_t nmea_message = {0};
 
     uint32_t last_transmission = 0;
-    uint32_t last_prediction = 0;
+    uint32_t last_rangefinder = 0;
+    uint32_t last_fake_gps = 0;
 
     while(1) {
         const uint32_t time = HAL_GetTick();
 
-        if((time - last_prediction)>=1) {
-            last_prediction = time;
+        if((time - last_rangefinder)>=100) {
+            last_rangefinder = time;
 
-            ekf_predict_18_0(&ekf, &system_model, NULL);
-        }
+            const float dist = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
 
-        const float dist = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
-        if(dist<2.f) {
-            readings.rangefinder = dist;
-            readings.valid.rangefinder = 1;
+            if(dist<2.f) {
+                readings.rangefinder = dist;
+                readings.valid.rangefinder = 1;
 
-            ekf_correct_18_1(&ekf, &rangefinder_model, &readings.rangefinder);
+                ekf_correct_23_1(&ekf, &rangefinder_model, &readings.rangefinder);
+            }
         }
 
         if(imu_ready) {
@@ -643,8 +643,16 @@ int main() {
             readings.calibrated.gyroscope[1] = readings.raw.gyroscope[1] + calibration.gyroscope[1];
             readings.calibrated.gyroscope[2] = readings.raw.gyroscope[2] + calibration.gyroscope[2];
 
-            ekf_correct_18_3(&ekf, &accelerometer_model, readings.calibrated.accelerometer);
-            ekf_correct_18_3(&ekf, &gyroscope_model, readings.calibrated.gyroscope);
+            const float u[6] = {
+                readings.calibrated.gyroscope[0],
+                readings.calibrated.gyroscope[1],
+                readings.calibrated.gyroscope[2],
+                readings.calibrated.accelerometer[0],
+                readings.calibrated.accelerometer[1],
+                readings.calibrated.accelerometer[2],
+            };
+
+            ekf_predict_23_6(&ekf, &system_model, u);
         }
 
         if(mag_ready) {
@@ -659,18 +667,7 @@ int main() {
             readings.calibrated.magnetometer[1] = calibration.magnetometer[3]*readings.raw.magnetometer[0] + calibration.magnetometer[4]*readings.raw.magnetometer[1] + calibration.magnetometer[5]*readings.raw.magnetometer[2] + calibration.magnetometer[10];
             readings.calibrated.magnetometer[2] = calibration.magnetometer[6]*readings.raw.magnetometer[0] + calibration.magnetometer[7]*readings.raw.magnetometer[1] + calibration.magnetometer[8]*readings.raw.magnetometer[2] + calibration.magnetometer[11];
 
-            const float mag_len = sqrtf(
-                readings.calibrated.magnetometer[0]*readings.calibrated.magnetometer[0] +
-                readings.calibrated.magnetometer[1]*readings.calibrated.magnetometer[1] +
-                readings.calibrated.magnetometer[2]*readings.calibrated.magnetometer[2]
-            );
-            const float mag_normalized[3] = {
-                readings.calibrated.magnetometer[0]/mag_len,
-                readings.calibrated.magnetometer[1]/mag_len,
-                readings.calibrated.magnetometer[2]/mag_len,
-            };
-
-            ekf_correct_18_3(&ekf, &magnetometer_model, mag_normalized);
+            ekf_correct_23_3(&ekf, &magnetometer_model, readings.calibrated.magnetometer);
         }
 
         if(bar_ready) {
@@ -678,8 +675,7 @@ int main() {
             bmp280_read(&readings.barometer, bar_buffer);
             readings.valid.barometer = 1;
 
-            ekf_correct_18_1(&ekf, &barometer_model, &readings.barometer);
-            HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+            // ekf_correct_23_1(&ekf, &barometer_model, &readings.barometer);
         }
 
         if(gps_ready) {
@@ -715,10 +711,18 @@ int main() {
                         readings.gps[1] = longitude;
                         readings.valid.gps = 1;
 
-                        //ekf_correct_18_2(&ekf, &gps_model, position);
+                        //ekf_correct_23_2(&ekf, &gps_model, position);
 					}
 				}
 			}
+        }
+
+        if((time - last_fake_gps)>=100) {
+            last_fake_gps = time;
+
+            const float position[2] = {0};
+
+            ekf_correct_23_2(&ekf, &gps_model, position);
         }
 
         uint8_t byte;

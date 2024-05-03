@@ -9,42 +9,56 @@ dt = Symbol('T')
 g = Symbol('g')
 
 qw, qx, qy, qz = sympy.symbols('q_w q_x q_y q_z')
-thetad = sympy.Symbol('theta_d')
+px, py, pz = sympy.symbols('p_x p_y p_z')
+vx, vy, vz = sympy.symbols('v_x v_y v_z')
+ax_bias, ay_bias, az_bias = sympy.symbols('a_bx a_by a_bz')
+wx_bias, wy_bias, wz_bias = sympy.symbols('w_bx w_by w_bz')
+mx_bias, my_bias, mz_bias = sympy.symbols('m_bx m_by m_bz')
+m0x, m0y, m0z = sympy.symbols('m_0x m_0y m_0z')
+p0 = sympy.symbols('p_0')
 wx, wy, wz = sympy.symbols('w_x w_y w_z')
 ax, ay, az = sympy.symbols('a_x a_y a_z')
-vx, vy, vz = sympy.symbols('v_x v_y v_z')
-px, py, pz = sympy.symbols('p_x p_y p_z')
-p0 = sympy.symbols('p_0')
 
 q = Quaternion(qw, qx, qy, qz, norm=1)
+p = Matrix([[px], [py], [pz]])
+v = Matrix([[vx], [vy], [vz]])
+a_bias = Matrix([[ax_bias], [ay_bias], [az_bias]])
+w_bias = Matrix([[wx_bias], [wy_bias], [wz_bias]])
+m_bias = Matrix([[mx_bias], [my_bias], [mz_bias]])
+m0 = Matrix([[m0x], [m0y], [m0z]])
 w = Matrix([[wx], [wy], [wz]])
 a = Matrix([[ax], [ay], [az]])
-v = Matrix([[vx], [vy], [vz]])
-p = Matrix([[px], [py], [pz]])
+
+gravity = Matrix([[0], [0], [-g]])
+
+u = Matrix([
+    w,
+    a,
+])
 
 x = Matrix([
     q.to_Matrix(),
-    [thetad],
-    w,
     p,
     v,
-    a,
+    a_bias,
+    w_bias,
+    m_bias,
+    m0,
     p0,
 ])
 
 f = Matrix([
-    (q + 0.5*dt*q*Quaternion(0, wx, wy, wz)).to_Matrix(),
-    [thetad],
-    w,
-    p + dt*v + 0.5*dt**2*a,
-    v + dt*a,
-    a,
-    [p0],
+    (q + 0.5*dt*q*Quaternion(0, wx - wx_bias, wy - wy_bias, wz - wz_bias)).to_Matrix(),
+    p + dt*v + 0.5*dt**2*(q.to_rotation_matrix()*a - a_bias - gravity),
+    v + dt*(q.to_rotation_matrix()*a - a_bias - gravity),
+    a_bias,
+    w_bias,
+    m_bias,
+    m0,
+    p0,
 ])
 
-h_accel = q.to_rotation_matrix().transpose()*(Matrix([[0], [0], [-g]]) + a)
-h_gyro = w
-h_mag = q.to_rotation_matrix().transpose()*Matrix([[0], [sympy.cos(thetad)], [sympy.sin(thetad)]])
+h_mag = q.to_rotation_matrix().transpose()*m0 + m_bias
 h_range = Matrix([pz])
 h_press = Matrix([p0*sympy.Pow(1 - pz/44330, 5.255)])
 h_gps = Matrix([[px], [py]])
@@ -58,23 +72,19 @@ with open('docs/estimator.tex', 'w') as file:
     file.write('\n')
     file.write('\\documentclass{article}\n')
     file.write('\\usepackage{amsmath}\n')
-    file.write('\\usepackage[paperwidth=40cm, paperheight=40cm, margin=10mm]{geometry}\n')
+    file.write('\\usepackage[paperwidth=50cm, paperheight=50cm, margin=10mm]{geometry}\n')
     file.write('\n')
     file.write('\\begin{document}\n')
-    file.write('\\[x_k = ' + sympy.latex(x) + ' = f(x_{k-1}) = ' + sympy.latex(f) + '\\]\n')
-    file.write('\\[\\frac{\partial}{\partial x}f(x_{k-1}) = ' + sympy.latex(f.jacobian(x)) + '\\]\n')
-    file.write('\\[h_{accel}(x_k) = ' + sympy.latex(h_accel) + '\\]\n')
-    file.write('\\[\\frac{\partial}{\partial x}h_{accel}(x_k) = ' + sympy.latex(h_accel.jacobian(x)) + '\\]\n')
-    file.write('\\[h_{gyro}(x_k) = ' + sympy.latex(h_gyro) + '\\]\n')
-    file.write('\\[\\frac{\partial}{\partial x}h_{gyro}(x_k) = ' + sympy.latex(h_gyro.jacobian(x)) + '\\]\n')
-    file.write('\\[h_{mag}(x_k) = ' + sympy.latex(h_mag) + '\\]\n')
-    file.write('\\[\\frac{\partial}{\partial x}h_{mag}(x_k) = ' + sympy.latex(h_mag.jacobian(x)) + '\\]\n')
-    file.write('\\[h_{range}(x_k) = ' + sympy.latex(h_range) + '\\]\n')
-    file.write('\\[\\frac{\partial}{\partial x}h_{range}(x_k) = ' + sympy.latex(h_range.jacobian(x)) + '\\]\n')
-    file.write('\\[h_{press}(x_k) = ' + sympy.latex(h_press) + '\\]\n')
-    file.write('\\[\\frac{\partial}{\partial x}h_{press}(x_k) = ' + sympy.latex(h_press.jacobian(x)) + '\\]\n')
-    file.write('\\[h_{gps}(x_k) = ' + sympy.latex(h_gps) + '\\]\n')
-    file.write('\\[\\frac{\partial}{\partial x}h_{gps}(x_k) = ' + sympy.latex(h_gps.jacobian(x)) + '\\]\n')
+    file.write('\t\\[x_k = ' + sympy.latex(x) + ' = f(x_{k-1}) = ' + sympy.latex(f) + '\\]\n')
+    file.write('\t\\[\\frac{\partial}{\partial x}f(x_{k-1}) = ' + sympy.latex(f.jacobian(x)) + '\\]\n')
+    file.write('\t\\[h_{mag}(x_k) = ' + sympy.latex(h_mag) + '\\]\n')
+    file.write('\t\\[\\frac{\partial}{\partial x}h_{mag}(x_k) = ' + sympy.latex(h_mag.jacobian(x)) + '\\]\n')
+    file.write('\t\\[h_{range}(x_k) = ' + sympy.latex(h_range) + '\\]\n')
+    file.write('\t\\[\\frac{\partial}{\partial x}h_{range}(x_k) = ' + sympy.latex(h_range.jacobian(x)) + '\\]\n')
+    file.write('\t\\[h_{press}(x_k) = ' + sympy.latex(h_press) + '\\]\n')
+    file.write('\t\\[\\frac{\partial}{\partial x}h_{press}(x_k) = ' + sympy.latex(h_press.jacobian(x)) + '\\]\n')
+    file.write('\t\\[h_{gps}(x_k) = ' + sympy.latex(h_gps) + '\\]\n')
+    file.write('\t\\[\\frac{\partial}{\partial x}h_{gps}(x_k) = ' + sympy.latex(h_gps.jacobian(x)) + '\\]\n')
     file.write('\\end{document}\n')
 
 with open('src/estimator.h', 'w') as file:
@@ -88,14 +98,12 @@ with open('src/estimator.h', 'w') as file:
     file.write('\n')
     file.write('extern ekf_t ekf;\n')
     file.write('extern ekf_system_model_t system_model;\n')
-    file.write('extern ekf_measurement_model_t accelerometer_model;\n')
-    file.write('extern ekf_measurement_model_t gyroscope_model;\n')
     file.write('extern ekf_measurement_model_t magnetometer_model;\n')
     file.write('extern ekf_measurement_model_t rangefinder_model;\n')
     file.write('extern ekf_measurement_model_t barometer_model;\n')
     file.write('extern ekf_measurement_model_t gps_model;\n')
     file.write('\n')
-    file.write('EKF_PREDICT_DEF(' + str(x.shape[0]) + ', 0)\n')
+    file.write('EKF_PREDICT_DEF(' + str(x.shape[0]) + ', ' + str(u.shape[0]) + ')\n')
     file.write('EKF_CORRECT_DEF(' + str(x.shape[0]) + ', 1)\n')
     file.write('EKF_CORRECT_DEF(' + str(x.shape[0]) + ', 2)\n')
     file.write('EKF_CORRECT_DEF(' + str(x.shape[0]) + ', 3)\n')
@@ -150,11 +158,17 @@ with open('src/estimator.c', 'w') as file:
         file.write('\n')
 
     def system_model(model, variance):
+        u_dim = u.shape[0]
         x_dim = x.shape[0]
         f_used = list(model.free_symbols)
         df_used = list(model.jacobian(x).free_symbols)
 
         file.write('static void system_f(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {\n')
+        for i in range(u_dim):
+            if u[i] in f_used:
+                file.write('\tconst float ' + sympy.ccode(u[i]) + ' = u->pData[' + str(i) + '];\n')
+        if len(f_used)>0:
+            file.write('\n')
         for i in range(x_dim):
             if x[i] in f_used:
                 file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
@@ -165,6 +179,11 @@ with open('src/estimator.c', 'w') as file:
         file.write('}\n')
         file.write('\n')
         file.write('static void system_df(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {\n')
+        for i in range(u_dim):
+            if u[i] in df_used:
+                file.write('\tconst float ' + sympy.ccode(u[i]) + ' = u->pData[' + str(i) + '];\n')
+        if len(f_used)>0:
+            file.write('\n')
         for i in range(x_dim):
             if x[i] in df_used:
                 file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
@@ -258,17 +277,15 @@ with open('src/estimator.c', 'w') as file:
     file.write('#include "ekf.h"\n')
     file.write('\n')
     file.write('#define g ' + str(scipy.constants.g) + 'f\n')
-    file.write('#define T ' + str(0.001) + 'f\n')
+    file.write('#define T ' + str(0.005) + 'f\n')
     file.write('\n')
-    estimator(Matrix([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
+    estimator(Matrix([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100000]))
     system_model(f, 1)
-    measurement_model('accelerometer', h_accel, 10)
-    measurement_model('gyroscope', h_gyro, 1)
-    measurement_model('magnetometer', h_mag, 10)
-    measurement_model('rangefinder', h_range, 10)
-    measurement_model('barometer', h_press, 100)
-    measurement_model('gps', h_gps, 1000)
-    file.write('EKF_PREDICT(' + str(x.shape[0]) + ', 0)\n')
+    measurement_model('magnetometer', h_mag, 100)
+    measurement_model('rangefinder', h_range, 100)
+    measurement_model('barometer', h_press, 10000)
+    measurement_model('gps', h_gps, 100000)
+    file.write('EKF_PREDICT(' + str(x.shape[0]) + ', ' + str(u.shape[0]) + ')\n')
     file.write('EKF_CORRECT(' + str(x.shape[0]) + ', 1)\n')
     file.write('EKF_CORRECT(' + str(x.shape[0]) + ', 2)\n')
     file.write('EKF_CORRECT(' + str(x.shape[0]) + ', 3)\n')
