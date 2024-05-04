@@ -11,10 +11,7 @@ g = Symbol('g')
 qw, qx, qy, qz = sympy.symbols('q_w q_x q_y q_z')
 px, py, pz = sympy.symbols('p_x p_y p_z')
 vx, vy, vz = sympy.symbols('v_x v_y v_z')
-ax_bias, ay_bias, az_bias = sympy.symbols('a_bx a_by a_bz')
-wx_bias, wy_bias, wz_bias = sympy.symbols('w_bx w_by w_bz')
-mx_bias, my_bias, mz_bias = sympy.symbols('m_bx m_by m_bz')
-m0x, m0y, m0z = sympy.symbols('m_0x m_0y m_0z')
+thetad = sympy.symbols('theta_d')
 p0 = sympy.symbols('p_0')
 wx, wy, wz = sympy.symbols('w_x w_y w_z')
 ax, ay, az = sympy.symbols('a_x a_y a_z')
@@ -22,10 +19,6 @@ ax, ay, az = sympy.symbols('a_x a_y a_z')
 q = Quaternion(qw, qx, qy, qz, norm=1)
 p = Matrix([[px], [py], [pz]])
 v = Matrix([[vx], [vy], [vz]])
-a_bias = Matrix([[ax_bias], [ay_bias], [az_bias]])
-w_bias = Matrix([[wx_bias], [wy_bias], [wz_bias]])
-m_bias = Matrix([[mx_bias], [my_bias], [mz_bias]])
-m0 = Matrix([[m0x], [m0y], [m0z]])
 w = Matrix([[wx], [wy], [wz]])
 a = Matrix([[ax], [ay], [az]])
 
@@ -40,33 +33,30 @@ x = Matrix([
     q.to_Matrix(),
     p,
     v,
-    a_bias,
-    w_bias,
-    m_bias,
-    m0,
+    thetad,
     p0,
 ])
 
 f = Matrix([
-    (q + 0.5*dt*q*Quaternion(0, wx - wx_bias, wy - wy_bias, wz - wz_bias)).to_Matrix(),
-    p + dt*v + 0.5*dt**2*(q.to_rotation_matrix()*a - a_bias - gravity),
-    v + dt*(q.to_rotation_matrix()*a - a_bias - gravity),
-    a_bias,
-    w_bias,
-    m_bias,
-    m0,
+    (q + 0.5*dt*q*Quaternion(0, wx, wy, wz)).to_Matrix(),
+    p + dt*v + 0.5*dt**2*(q.to_rotation_matrix()*a - gravity),
+    v + dt*(q.to_rotation_matrix()*a - gravity),
+    thetad,
     p0,
 ])
 
-h_mag = q.to_rotation_matrix().transpose()*m0 + m_bias
+h_mag = q.to_rotation_matrix().transpose()*Matrix([[0], [sympy.cos(thetad)], [sympy.sin(thetad)]])
 h_range = Matrix([pz])
 h_press = Matrix([p0*sympy.Pow(1 - pz/44330, 5.255)])
 h_gps = Matrix([[px], [py]])
 
-os.makedirs('docs', exist_ok=True)
-os.makedirs('src', exist_ok=True)
+output_directory = os.path.dirname(__file__) + '/estimator'
 
-with open('docs/estimator.tex', 'w') as file:
+os.makedirs(output_directory, exist_ok=True)
+os.makedirs(output_directory + '/docs', exist_ok=True)
+os.makedirs(output_directory + '/src', exist_ok=True)
+
+with open(output_directory + '/docs/estimator.tex', 'w') as file:
     file.write('% auto-generated file\n')
     file.write('% ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n')
     file.write('\n')
@@ -87,7 +77,7 @@ with open('docs/estimator.tex', 'w') as file:
     file.write('\t\\[\\frac{\partial}{\partial x}h_{gps}(x_k) = ' + sympy.latex(h_gps.jacobian(x)) + '\\]\n')
     file.write('\\end{document}\n')
 
-with open('src/estimator.h', 'w') as file:
+with open(output_directory + '/src/estimator.h', 'w') as file:
     file.write('// auto-generated file\n')
     file.write('// ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n')
     file.write('\n')
@@ -110,7 +100,7 @@ with open('src/estimator.h', 'w') as file:
     file.write('\n')
     file.write('#endif\n')
 
-with open('src/estimator.c', 'w') as file:
+with open(output_directory + '/src/estimator.c', 'w') as file:
     functions = {
         'Pow': [
             (lambda base, exponent: exponent==2, lambda base, exponent: '(%s)*(%s)' % (base, base)),
@@ -122,7 +112,9 @@ with open('src/estimator.c', 'w') as file:
         sympy.codegen.ast.real: sympy.codegen.ast.float32,
     }
 
-    def estimator(initial):
+    def estimator(initial, variance):
+        assert len(initial) == x.shape[0]
+
         x_dim = x.shape[0]
 
         file.write('static float x_data[' + str(x_dim) + '] = {\n')
@@ -139,7 +131,7 @@ with open('src/estimator.c', 'w') as file:
             file.write('\t')
             for j in range(x_dim):
                 if i==j:
-                    file.write('1,')
+                    file.write(str(variance) + ',')
                 else:
                     file.write('0,')
                 if j!=(x_dim-1):
@@ -158,6 +150,8 @@ with open('src/estimator.c', 'w') as file:
         file.write('\n')
 
     def system_model(model, variance):
+        assert len(variance) == x.shape[0]
+
         u_dim = u.shape[0]
         x_dim = x.shape[0]
         f_used = list(model.free_symbols)
@@ -201,7 +195,7 @@ with open('src/estimator.c', 'w') as file:
             file.write('\t')
             for j in range(x_dim):
                 if i==j:
-                    file.write(str(variance) + ',')
+                    file.write(str(variance[i]) + ',')
                 else:
                     file.write('0,')
                 if j!=(x_dim-1):
@@ -279,15 +273,15 @@ with open('src/estimator.c', 'w') as file:
     file.write('#define g ' + str(scipy.constants.g) + 'f\n')
     file.write('#define T ' + str(0.005) + 'f\n')
     file.write('\n')
-    estimator(Matrix([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100000]))
-    system_model(f, 1)
+    estimator([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100000], 1)
+    system_model(f, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     measurement_model('magnetometer', h_mag, 100)
     measurement_model('rangefinder', h_range, 100)
     measurement_model('barometer', h_press, 10000)
-    measurement_model('gps', h_gps, 100000)
+    measurement_model('gps', h_gps, 10000)
     file.write('EKF_PREDICT(' + str(x.shape[0]) + ', ' + str(u.shape[0]) + ')\n')
     file.write('EKF_CORRECT(' + str(x.shape[0]) + ', 1)\n')
     file.write('EKF_CORRECT(' + str(x.shape[0]) + ', 2)\n')
     file.write('EKF_CORRECT(' + str(x.shape[0]) + ', 3)\n')
 
-os.system('pdflatex -interaction=nonstopmode -output-directory=docs docs/estimator.tex')
+os.system('pdflatex -interaction=nonstopmode -output-directory=' + output_directory + '/docs ' + output_directory + '/docs/estimator.tex')

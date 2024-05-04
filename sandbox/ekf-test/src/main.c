@@ -563,6 +563,42 @@ void logger(const char *format, ...) {
     comm_transmit(&comm_esp, buffer, size);
 }
 
+#define REF_LATITUDE    0.950871f // 54*28'51.2''
+#define REF_LONGITUDE   0.323817f // 18*33'12.1''
+#define EARTH_RADIUS    6371000.f
+#define DEG_2_RAD       0.01745329251f
+
+void gps_to_enu(const float *position, float *cartesian) {
+    const float lat = position[0]*DEG_2_RAD;
+    const float lon = position[1]*DEG_2_RAD;
+
+    const float ecef[3] = {
+        EARTH_RADIUS*cosf(lat)*cosf(lon),
+        EARTH_RADIUS*cosf(lat)*sinf(lon),
+        EARTH_RADIUS*sinf(lat)
+    };
+
+    const float ecef_ref[3] = {
+        EARTH_RADIUS*cosf(REF_LATITUDE)*cosf(REF_LONGITUDE),
+        EARTH_RADIUS*cosf(REF_LATITUDE)*sinf(REF_LONGITUDE),
+        EARTH_RADIUS*sinf(REF_LATITUDE)
+    };
+
+    const float s_phi = sinf(REF_LATITUDE);
+    const float c_phi = cosf(REF_LATITUDE);
+    const float s_lambda = sinf(REF_LONGITUDE);
+    const float c_lambda = cosf(REF_LONGITUDE);
+
+    const float R[3*3] = {
+        -s_lambda, c_lambda, 0,
+        -s_phi*c_lambda, -s_phi*s_lambda, c_phi,
+        c_phi*c_lambda, c_phi*s_lambda, s_phi
+    };
+
+    cartesian[0] = R[0]*(ecef[0] - ecef_ref[0]) + R[1]*(ecef[1] - ecef_ref[1]) + R[2]*(ecef[2] - ecef_ref[2]);
+    cartesian[1] = R[3]*(ecef[0] - ecef_ref[0]) + R[4]*(ecef[1] - ecef_ref[1]) + R[5]*(ecef[2] - ecef_ref[2]);
+}
+
 int main() {
 
     HAL_Init();
@@ -608,7 +644,7 @@ int main() {
 
     uint32_t last_transmission = 0;
     uint32_t last_rangefinder = 0;
-    uint32_t last_fake_gps = 0;
+    //uint32_t last_fake_gps = 0;
 
     while(1) {
         const uint32_t time = HAL_GetTick();
@@ -622,7 +658,7 @@ int main() {
                 readings.rangefinder = dist;
                 readings.valid.rangefinder = 1;
 
-                ekf_correct_23_1(&ekf, &rangefinder_model, &readings.rangefinder);
+                ekf_correct_12_1(&ekf, &rangefinder_model, &readings.rangefinder);
             }
         }
 
@@ -652,7 +688,7 @@ int main() {
                 readings.calibrated.accelerometer[2],
             };
 
-            ekf_predict_23_6(&ekf, &system_model, u);
+            ekf_predict_12_6(&ekf, &system_model, u);
         }
 
         if(mag_ready) {
@@ -667,7 +703,18 @@ int main() {
             readings.calibrated.magnetometer[1] = calibration.magnetometer[3]*readings.raw.magnetometer[0] + calibration.magnetometer[4]*readings.raw.magnetometer[1] + calibration.magnetometer[5]*readings.raw.magnetometer[2] + calibration.magnetometer[10];
             readings.calibrated.magnetometer[2] = calibration.magnetometer[6]*readings.raw.magnetometer[0] + calibration.magnetometer[7]*readings.raw.magnetometer[1] + calibration.magnetometer[8]*readings.raw.magnetometer[2] + calibration.magnetometer[11];
 
-            ekf_correct_23_3(&ekf, &magnetometer_model, readings.calibrated.magnetometer);
+            const float mag_len = sqrtf(
+                readings.calibrated.magnetometer[0]*readings.calibrated.magnetometer[0] +
+                readings.calibrated.magnetometer[1]*readings.calibrated.magnetometer[1] +
+                readings.calibrated.magnetometer[2]*readings.calibrated.magnetometer[2]
+            );
+            const float mag_normalized[3] = {
+                readings.calibrated.magnetometer[0]/mag_len,
+                readings.calibrated.magnetometer[1]/mag_len,
+                readings.calibrated.magnetometer[2]/mag_len,
+            };
+
+            ekf_correct_12_3(&ekf, &magnetometer_model, mag_normalized);
         }
 
         if(bar_ready) {
@@ -675,7 +722,7 @@ int main() {
             bmp280_read(&readings.barometer, bar_buffer);
             readings.valid.barometer = 1;
 
-            // ekf_correct_23_1(&ekf, &barometer_model, &readings.barometer);
+            ekf_correct_12_1(&ekf, &barometer_model, &readings.barometer);
         }
 
         if(gps_ready) {
@@ -711,19 +758,22 @@ int main() {
                         readings.gps[1] = longitude;
                         readings.valid.gps = 1;
 
-                        //ekf_correct_23_2(&ekf, &gps_model, position);
+                        float position[2];
+                        gps_to_enu(readings.gps, position);
+
+                        ekf_correct_12_2(&ekf, &gps_model, position);
 					}
 				}
 			}
         }
 
-        if((time - last_fake_gps)>=100) {
+        /*if((time - last_fake_gps)>=100) {
             last_fake_gps = time;
 
             const float position[2] = {0};
 
-            ekf_correct_23_2(&ekf, &gps_model, position);
-        }
+            ekf_correct_12_2(&ekf, &gps_model, position);
+        }*/
 
         uint8_t byte;
         while(comm_receive(&comm_esp, &byte)) {

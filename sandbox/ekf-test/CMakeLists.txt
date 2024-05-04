@@ -31,7 +31,7 @@ add_executable(${TARGET}
 
 	"../../shared/protocol/protocol.c"
 
-	"../estimator/src/estimator.c"
+	"estimator/src/estimator.c"
 
 	"device/system_stm32f4xx.c"
 	"device/startup_stm32f411retx.s"
@@ -59,7 +59,7 @@ target_include_directories(${TARGET} PRIVATE
 	"../../third-party/stm32f4xx_hal_driver/Inc"
 	"../../third-party/cmsis_core/DSP/Include"
 	"../../shared/protocol"
-	"../estimator/src"
+	"estimator/src"
 	"HAL"
 	"include"
 )

@@ -63,7 +63,10 @@ int main(int argc, char *argv[]) {
 	client.write("create goose            empty\n");
 	client.write("create goose.acc        empty\n");
 	client.write("create goose.mag        empty\n");
-	client.write("create goose.marker     cuboid material color 255 255 255 transform scale 0.20 0.10 0.05\n");
+	client.write("create goose.marker     cuboid material color 255 255 255 transform scale 0.25 0.25 0.25\n");
+	client.write("create goose.markerX    cuboid material color 255   0   0 transform scale 1.00 0.05 0.05 translation 0.5 0 0\n");
+	client.write("create goose.markerY    cuboid material color   0 255   0 transform scale 0.05 1.00 0.05 translation 0 0.5 0\n");
+	client.write("create goose.markerZ    cuboid material color   0   0 255 transform scale 0.05 0.05 1.00 translation 0 0 0.5\n");
 	client.write("create goose.acc.marker sphere material color 0   255   0 transform scale 0.05 0.05 0.05\n");
 	client.write("create goose.mag.marker sphere material color 0   0   255 transform scale 0.05 0.05 0.05\n");
 
