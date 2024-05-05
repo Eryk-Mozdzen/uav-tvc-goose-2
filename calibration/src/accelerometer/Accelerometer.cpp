@@ -8,7 +8,7 @@
 
 #include "Accelerometer.h"
 
-Accelerometer::Accelerometer(QWidget *parent) : Interface{"accelerometer", parent} {
+Accelerometer::Accelerometer(QWidget *parent) : Interface{"accelerometer", parent}, scale{Eigen::Matrix3d::Identity()}, offset{Eigen::Vector3d::Zero()} {
     const std::vector<std::pair<QString, Eigen::Vector3d>> predefined = {
         std::make_pair("+X", Eigen::Vector3d( g,  0,  0)),
         std::make_pair("+Y", Eigen::Vector3d( 0,  g,  0)),

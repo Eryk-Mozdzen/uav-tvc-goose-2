@@ -39,8 +39,8 @@ x = Matrix([
 
 f = Matrix([
     (q + 0.5*dt*q*Quaternion(0, wx, wy, wz)).to_Matrix(),
-    p + dt*v + 0.5*dt**2*(q.to_rotation_matrix()*a - gravity),
-    v + dt*(q.to_rotation_matrix()*a - gravity),
+    p + dt*v - 0.5*dt**2*(q.to_rotation_matrix()*a - gravity),
+    v - dt*(q.to_rotation_matrix()*a - gravity),
     thetad,
     p0,
 ])
@@ -276,9 +276,9 @@ with open(output_directory + '/src/estimator.c', 'w') as file:
     estimator([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100000], 1)
     system_model(f, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     measurement_model('magnetometer', h_mag, 100)
-    measurement_model('rangefinder', h_range, 100)
+    measurement_model('rangefinder', h_range, 1000)
     measurement_model('barometer', h_press, 10000)
-    measurement_model('gps', h_gps, 10000)
+    measurement_model('gps', h_gps, 10000000)
     file.write('EKF_PREDICT(' + str(x.shape[0]) + ', ' + str(u.shape[0]) + ')\n')
     file.write('EKF_CORRECT(' + str(x.shape[0]) + ', 1)\n')
     file.write('EKF_CORRECT(' + str(x.shape[0]) + ', 2)\n')

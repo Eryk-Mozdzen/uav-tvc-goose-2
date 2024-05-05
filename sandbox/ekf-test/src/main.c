@@ -642,7 +642,8 @@ int main() {
     protocol_readings_t readings = {0};
     nmea_messaage_t nmea_message = {0};
 
-    uint32_t last_transmission = 0;
+    uint32_t last_readings = 0;
+    uint32_t last_estimations = 0;
     uint32_t last_rangefinder = 0;
     //uint32_t last_fake_gps = 0;
 
@@ -811,16 +812,20 @@ int main() {
             }
         }
 
-        if((time - last_transmission)>100) {
-            last_transmission = time;
+        if((time - last_readings)>100) {
+            last_readings = time;
+
+            transmit(PROTOCOL_ID_READINGS, &readings, sizeof(readings));
+
+            readings.valid_all = 0;
+        }
+
+        if((time - last_estimations)>33) {
+            last_estimations = time;
 
             protocol_estimation_t estimation = {0};
             memcpy(&estimation, ekf.x.pData, sizeof(estimation));
-
-            transmit(PROTOCOL_ID_READINGS, &readings, sizeof(readings));
             transmit(PROTOCOL_ID_ESTIMATION, &estimation, sizeof(estimation));
-
-            readings.valid_all = 0;
         }
     }
 }
