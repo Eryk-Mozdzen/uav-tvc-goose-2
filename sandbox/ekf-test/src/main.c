@@ -163,7 +163,7 @@ static void MX_TIM11_Init() {
     TIM_OC_InitTypeDef sConfigOC = {0};
 
     htim11.Instance = TIM11;
-    htim11.Init.Prescaler = 100-1;
+    htim11.Init.Prescaler = 500-1;
     htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
     htim11.Init.Period = 20000-1;
     htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -457,10 +457,12 @@ uint8_t imu_buffer[14];
 uint8_t mag_buffer[6];
 uint8_t bar_buffer[6];
 uint8_t gps_buffer[16];
+uint32_t range_duration;
 volatile uint8_t imu_ready = 0;
 volatile uint8_t mag_ready = 0;
 volatile uint8_t bar_ready = 0;
 volatile uint8_t gps_ready = 0;
+volatile uint8_t range_ready = 0;
 
 comm_instance_t comm_esp = {.huart = &huart1};
 comm_instance_t comm_usb = {.huart = &huart2};
@@ -480,6 +482,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		// bar
 		HAL_I2C_Mem_Read_DMA(&hi2c3, BMP280_ADDR<<1, BMP280_REG_PRESS_MSB, 1, bar_buffer, sizeof(bar_buffer));
 	}
+}
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
+    if(htim==&htim2) {
+        range_duration = HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
+        range_ready = 1;
+    }
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
@@ -630,7 +639,7 @@ int main() {
     __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, 10);
     HAL_TIM_PWM_Start(&htim11, TIM_CHANNEL_1);
     HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_1);
-    HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_2);
+    HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
 
     HAL_UART_Receive_DMA(&huart6, gps_buffer, sizeof(gps_buffer));
 
@@ -644,16 +653,15 @@ int main() {
 
     uint32_t last_readings = 0;
     uint32_t last_estimations = 0;
-    uint32_t last_rangefinder = 0;
     //uint32_t last_fake_gps = 0;
 
     while(1) {
         const uint32_t time = HAL_GetTick();
 
-        if((time - last_rangefinder)>=100) {
-            last_rangefinder = time;
+        if(range_ready) {
+            range_ready = 0;
 
-            const float dist = 0.00017015f*HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_2);
+            const float dist = 0.00017015f*range_duration;
 
             if(dist<2.f) {
                 readings.rangefinder = dist;
@@ -768,7 +776,7 @@ int main() {
 			}
         }
 
-        /*if((time - last_fake_gps)>=100) {
+        /*if((time - last_fake_gps)>100) {
             last_fake_gps = time;
 
             const float position[2] = {0};
