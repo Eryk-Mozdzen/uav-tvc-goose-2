@@ -688,16 +688,41 @@ int main() {
             readings.calibrated.gyroscope[1] = readings.raw.gyroscope[1] + calibration.gyroscope[1];
             readings.calibrated.gyroscope[2] = readings.raw.gyroscope[2] + calibration.gyroscope[2];
 
+            const float qw = ekf.x.pData[0];
+            const float qx = ekf.x.pData[1];
+            const float qy = ekf.x.pData[2];
+            const float qz = ekf.x.pData[3];
+            const float g = 9.80665f;
+            const float ax = (1.f - 2.f*qy*qy - 2.f*qz*qz)*readings.calibrated.accelerometer[0] + (2.f*qx*qy - 2.f*qz*qw)*readings.calibrated.accelerometer[1] + (2.f*qx*qz + 2.f*qy*qw)*readings.calibrated.accelerometer[2];
+            const float ay = (2.f*qx*qy + 2.f*qz*qw)*readings.calibrated.accelerometer[0] + (1.f - 2.f*qx*qx - 2.f*qz*qz)*readings.calibrated.accelerometer[1] + (2.f*qy*qz - 2.f*qx*qw)*readings.calibrated.accelerometer[2];
+            const float az = (2.f*qx*qz - 2.f*qy*qw)*readings.calibrated.accelerometer[0] + (2.f*qy*qz + 2.f*qx*qw)*readings.calibrated.accelerometer[1] + (1.f - 2.f*qx*qx - 2.f*qy*qy)*readings.calibrated.accelerometer[2];
+
             const float u[6] = {
                 readings.calibrated.gyroscope[0],
                 readings.calibrated.gyroscope[1],
                 readings.calibrated.gyroscope[2],
-                readings.calibrated.accelerometer[0],
-                readings.calibrated.accelerometer[1],
-                readings.calibrated.accelerometer[2],
+                -ax,
+                -ay,
+                -(az + g),
             };
 
             ekf_predict_12_6(&ekf, &system_model, u);
+
+            const float acc_len = sqrtf(
+                readings.calibrated.accelerometer[0]*readings.calibrated.accelerometer[0] +
+                readings.calibrated.accelerometer[1]*readings.calibrated.accelerometer[1] +
+                readings.calibrated.accelerometer[2]*readings.calibrated.accelerometer[2]
+            );
+
+            if(acc_len>g*0.99f && acc_len<g*1.01f) {
+                const float acc_unit[3] = {
+                    readings.calibrated.accelerometer[0]/acc_len,
+                    readings.calibrated.accelerometer[1]/acc_len,
+                    readings.calibrated.accelerometer[2]/acc_len,
+                };
+
+                ekf_correct_12_3(&ekf, &accelerometer_model, acc_unit);
+            }
         }
 
         if(mag_ready) {

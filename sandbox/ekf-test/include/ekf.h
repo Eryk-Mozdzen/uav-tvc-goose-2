@@ -10,14 +10,14 @@ typedef struct {
 
 typedef struct {
     arm_matrix_instance_f32 Q;
-    void (*f)(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next);
-	void (*df)(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next);
+    void (*f)(const float *x, const float *u, float *x_next);
+	void (*df)(const float *x, const float *u, float *x_next);
 } ekf_system_model_t;
 
 typedef struct {
     arm_matrix_instance_f32 R;
-    void (*h)(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z);
-	void (*dh)(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z);
+    void (*h)(const float *x, float *z);
+	void (*dh)(const float *x, float *z);
 } ekf_measurement_model_t;
 
 #define EKF_PREDICT_DEF(X, U) \
@@ -41,7 +41,7 @@ typedef struct {
             .pData = F_data \
         }; \
  \
-        system->df(&ekf->x, &u, &F); \
+        system->df(ekf->x.pData, u.pData, F.pData); \
  \
         float x_next_data[X]; \
         arm_matrix_instance_f32 x_next = { \
@@ -49,7 +49,7 @@ typedef struct {
             .numCols = 1, \
             .pData = x_next_data \
         }; \
-        system->f(&ekf->x, &u, &x_next); \
+        system->f(ekf->x.pData, u.pData, x_next.pData); \
         memcpy(ekf->x.pData, x_next.pData, X*sizeof(float)); \
  \
         float FT_data[X*X]; \
@@ -89,7 +89,7 @@ typedef struct {
             .pData = H_data \
         }; \
  \
-        measurement->dh(&ekf->x, &H); \
+        measurement->dh(ekf->x.pData, H.pData); \
  \
         float HT_data[X*Z]; \
         arm_matrix_instance_f32 HT = { \
@@ -119,7 +119,7 @@ typedef struct {
             .numCols = 1, \
             .pData = h_data \
         }; \
-        measurement->h(&ekf->x, &h); \
+        measurement->h(ekf->x.pData, h.pData); \
         arm_mat_sub_f32(&z, &h, &y); \
  \
         float PHT_data[X*Z]; \

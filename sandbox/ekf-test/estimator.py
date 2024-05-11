@@ -39,13 +39,14 @@ x = Matrix([
 
 f = Matrix([
     (q + 0.5*dt*q*Quaternion(0, wx, wy, wz)).to_Matrix(),
-    p + dt*v - 0.5*dt**2*(q.to_rotation_matrix()*a - gravity),
-    v - dt*(q.to_rotation_matrix()*a - gravity),
+    p + dt*v + 0.5*dt**2*a,
+    v + dt*a,
     thetad,
     p0,
 ])
 
 h_mag = q.to_rotation_matrix().transpose()*Matrix([[0], [sympy.cos(thetad)], [sympy.sin(thetad)]])
+h_acc = q.to_rotation_matrix().transpose()*Matrix([[0], [0], [-1]])
 h_range = Matrix([pz])
 h_press = Matrix([p0*sympy.Pow(1 - pz/44330, 5.255)])
 h_gps = Matrix([[px], [py]])
@@ -69,6 +70,8 @@ with open(output_directory + '/docs/estimator.tex', 'w') as file:
     file.write('\t\\[\\frac{\partial}{\partial x}f(x_{k-1}) = ' + sympy.latex(f.jacobian(x)) + '\\]\n')
     file.write('\t\\[h_{mag}(x_k) = ' + sympy.latex(h_mag) + '\\]\n')
     file.write('\t\\[\\frac{\partial}{\partial x}h_{mag}(x_k) = ' + sympy.latex(h_mag.jacobian(x)) + '\\]\n')
+    file.write('\t\\[h_{acc}(x_k) = ' + sympy.latex(h_acc) + '\\]\n')
+    file.write('\t\\[\\frac{\partial}{\partial x}h_{acc}(x_k) = ' + sympy.latex(h_acc.jacobian(x)) + '\\]\n')
     file.write('\t\\[h_{range}(x_k) = ' + sympy.latex(h_range) + '\\]\n')
     file.write('\t\\[\\frac{\partial}{\partial x}h_{range}(x_k) = ' + sympy.latex(h_range.jacobian(x)) + '\\]\n')
     file.write('\t\\[h_{press}(x_k) = ' + sympy.latex(h_press) + '\\]\n')
@@ -89,6 +92,7 @@ with open(output_directory + '/src/estimator.h', 'w') as file:
     file.write('extern ekf_t ekf;\n')
     file.write('extern ekf_system_model_t system_model;\n')
     file.write('extern ekf_measurement_model_t magnetometer_model;\n')
+    file.write('extern ekf_measurement_model_t accelerometer_model;\n')
     file.write('extern ekf_measurement_model_t rangefinder_model;\n')
     file.write('extern ekf_measurement_model_t barometer_model;\n')
     file.write('extern ekf_measurement_model_t gps_model;\n')
@@ -157,35 +161,35 @@ with open(output_directory + '/src/estimator.c', 'w') as file:
         f_used = list(model.free_symbols)
         df_used = list(model.jacobian(x).free_symbols)
 
-        file.write('static void system_f(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {\n')
+        file.write('static void system_f(const float *x, const float *u, float *x_next) {\n')
         for i in range(u_dim):
             if u[i] in f_used:
-                file.write('\tconst float ' + sympy.ccode(u[i]) + ' = u->pData[' + str(i) + '];\n')
+                file.write('\tconst float ' + sympy.ccode(u[i]) + ' = u[' + str(i) + '];\n')
         if len(f_used)>0:
             file.write('\n')
         for i in range(x_dim):
             if x[i] in f_used:
-                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
+                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x[' + str(i) + '];\n')
         if len(f_used)>0:
             file.write('\n')
         for i in range(x_dim):
-            file.write('\tx_next->pData[' + str(i) + '] = ' + sympy.ccode(model[i], user_functions=functions, type_aliases=aliases) + ';\n')
+            file.write('\tx_next[' + str(i) + '] = ' + sympy.ccode(model[i], user_functions=functions, type_aliases=aliases) + ';\n')
         file.write('}\n')
         file.write('\n')
-        file.write('static void system_df(const arm_matrix_instance_f32 *x, const arm_matrix_instance_f32 *u, arm_matrix_instance_f32 *x_next) {\n')
+        file.write('static void system_df(const float *x, const float *u, float *x_next) {\n')
         for i in range(u_dim):
             if u[i] in df_used:
-                file.write('\tconst float ' + sympy.ccode(u[i]) + ' = u->pData[' + str(i) + '];\n')
+                file.write('\tconst float ' + sympy.ccode(u[i]) + ' = u[' + str(i) + '];\n')
         if len(f_used)>0:
             file.write('\n')
         for i in range(x_dim):
             if x[i] in df_used:
-                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
+                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x[' + str(i) + '];\n')
         if len(df_used)>0:
             file.write('\n')
         for i in range(x_dim):
             for j in range(x_dim):
-                file.write('\tx_next->pData[' + str(i*x_dim + j) + '] = ' + sympy.ccode(model.jacobian(x)[i, j], user_functions=functions, type_aliases=aliases) + ';\n')
+                file.write('\tx_next[' + str(i*x_dim + j) + '] = ' + sympy.ccode(model.jacobian(x)[i, j], user_functions=functions, type_aliases=aliases) + ';\n')
             if i!=(x_dim-1):
                 file.write('\n')
         file.write('}\n')
@@ -218,25 +222,25 @@ with open(output_directory + '/src/estimator.c', 'w') as file:
         h_used = list(model.free_symbols)
         dh_used = list(model.jacobian(x).free_symbols)
 
-        file.write('static void ' + name + '_h(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {\n')
+        file.write('static void ' + name + '_h(const float *x, float *z) {\n')
         for i in range(x_dim):
             if x[i] in h_used:
-                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
+                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x[' + str(i) + '];\n')
         if len(h_used)>0:
             file.write('\n')
         for i in range(z_dim):
-            file.write('\tz->pData[' + str(i) + '] = ' + sympy.ccode(model[i], user_functions=functions, type_aliases=aliases) + ';\n')
+            file.write('\tz[' + str(i) + '] = ' + sympy.ccode(model[i], user_functions=functions, type_aliases=aliases) + ';\n')
         file.write('}\n')
         file.write('\n')
-        file.write('static void ' + name + '_dh(const arm_matrix_instance_f32 *x, arm_matrix_instance_f32 *z) {\n')
+        file.write('static void ' + name + '_dh(const float *x, float *z) {\n')
         for i in range(x_dim):
             if x[i] in dh_used:
-                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x->pData[' + str(i) + '];\n')
+                file.write('\tconst float ' + sympy.ccode(x[i]) + ' = x[' + str(i) + '];\n')
         if len(dh_used)>0:
             file.write('\n')
         for i in range(z_dim):
             for j in range(x_dim):
-                file.write('\tz->pData[' + str(i*x_dim + j) + '] = ' + sympy.ccode(model.jacobian(x)[i, j], user_functions=functions, type_aliases=aliases) + ';\n')
+                file.write('\tz[' + str(i*x_dim + j) + '] = ' + sympy.ccode(model.jacobian(x)[i, j], user_functions=functions, type_aliases=aliases) + ';\n')
             if i!=(z_dim-1):
                 file.write('\n')
         file.write('}\n')
@@ -276,9 +280,10 @@ with open(output_directory + '/src/estimator.c', 'w') as file:
     estimator([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100000], 1)
     system_model(f, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     measurement_model('magnetometer', h_mag, 100)
+    measurement_model('accelerometer', h_acc, 10000)
     measurement_model('rangefinder', h_range, 1000)
     measurement_model('barometer', h_press, 10000)
-    measurement_model('gps', h_gps, 10000000)
+    measurement_model('gps', h_gps, 1000000)
     file.write('EKF_PREDICT(' + str(x.shape[0]) + ', ' + str(u.shape[0]) + ')\n')
     file.write('EKF_CORRECT(' + str(x.shape[0]) + ', 1)\n')
     file.write('EKF_CORRECT(' + str(x.shape[0]) + ', 2)\n')
