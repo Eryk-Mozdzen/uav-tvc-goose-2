@@ -721,7 +721,7 @@ int main() {
                     readings.calibrated.accelerometer[2]/acc_len,
                 };
 
-                ekf_correct_12_3(&ekf, &accelerometer_model, acc_unit);
+                ekf_correct_12_3(&ekf, &gravity_model, acc_unit);
             }
         }
 
