@@ -275,7 +275,7 @@ with open(output_directory + '/src/estimator.c', 'w') as file:
     file.write('#include "ekf.h"\n')
     file.write('\n')
     file.write('#define g ' + str(scipy.constants.g) + 'f\n')
-    file.write('#define T ' + str(0.001) + 'f\n')
+    file.write('#define T ' + str(0.005) + 'f\n')
     file.write('\n')
     estimator([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100000], 1)
     system_model(f, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
