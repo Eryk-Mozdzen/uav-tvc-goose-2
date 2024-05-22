@@ -3,3 +3,9 @@
 **/.vscode
 
 **/estimator
+
+**/.metadata
+**/.settings
+**/Debug
+**/Release
+**/*.launch
