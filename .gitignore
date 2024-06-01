@@ -2,5 +2,11 @@
 **/build
 **/.vscode
 
-sandbox/estimator/docs
-sandbox/estimator/src
+**/estimator
+**/multi-station/docs
+
+**/.metadata
+**/.settings
+**/Debug
+**/Release
+**/*.launch
